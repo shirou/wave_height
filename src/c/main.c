@@ -25,6 +25,7 @@
 
 #include "datalog.h"
 #include "settings.h"
+#include "settings_window.h"
 #include "ui.h"
 #include "wave/session.h"
 
@@ -108,6 +109,13 @@ static void accel_handler(AccelData *data, uint32_t num_samples) {
   wh_datalog_push(buf, n);
   wh_ui_set_logging(wh_datalog_available());
 
+  /* While the noise floor is being calibrated the samples belong to that run
+   * and must not also be folded into the measurement, or the two would
+   * accumulate from the same data. */
+  if (wh_settings_feed_accel(buf, n)) {
+    return;
+  }
+
   if (!s_rate_ok) {
     wave_display stale;
     wave_session_get_display(&s_session, &stale);
@@ -171,13 +179,29 @@ static void back_long_click(ClickRecognizerRef recognizer, void *context) {
   window_stack_pop(true);
 }
 
+static void select_click(ClickRecognizerRef recognizer, void *context) {
+  wh_settings_window_push(&s_settings);
+}
+
 static void click_config_provider(void *context) {
   window_long_click_subscribe(BUTTON_ID_BACK, 0, back_long_click, NULL);
+  window_single_click_subscribe(BUTTON_ID_SELECT, select_click);
 }
 
 static void window_load(Window *window) {
   wh_ui_create(window, &s_settings);
   window_set_click_config_provider(window, click_config_provider);
+}
+
+static void window_appear(Window *window) {
+  /* Settings may have changed while this window was covered.
+   *
+   * The accumulated spectrum is deliberately kept: the noise floor is
+   * subtracted when the result is computed, not when a segment is folded in, so
+   * a freshly calibrated floor applies to everything already gathered. Throwing
+   * the accumulation away would cost the user their measurement for no gain. */
+  s_session.acc.noise_floor = s_settings.noise_floor;
+  s_session.diagnostic = s_settings.diagnostic_mode;
 }
 
 static void window_unload(Window *window) {
@@ -196,6 +220,7 @@ static void init(void) {
   s_window = window_create();
   window_set_window_handlers(s_window, (WindowHandlers){
                                            .load = window_load,
+                                           .appear = window_appear,
                                            .unload = window_unload,
                                        });
   window_stack_push(s_window, true);

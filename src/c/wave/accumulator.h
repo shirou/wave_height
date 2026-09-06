@@ -62,4 +62,17 @@ void wave_accum_add(wave_accumulator *a, const float *psd);
  * out->valid is false and the caller shows "calm" rather than a number. */
 bool wave_accum_result(const wave_accumulator *a, wave_result *out);
 
+/*
+ * Estimate the sensor noise floor from the averaged spectrum, for use as the
+ * noise_floor constant on a later run.
+ *
+ * Only meaningful when the watch was still: what it returns is simply the
+ * median of the in-band values, which is the noise floor precisely because
+ * there is no wave energy to measure. The median rather than the mean so that
+ * a stray knock during calibration does not drag the estimate up.
+ *
+ * Returns 0 if too few segments have been folded in to say anything.
+ */
+float wave_accum_noise_estimate(const wave_accumulator *a);
+
 #endif /* WAVE_ACCUMULATOR_H */

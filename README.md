@@ -107,6 +107,24 @@ that does not creep upward the longer you measure.
 Hold **Back** to exit. A short press does nothing, so the accumulation survives
 the watch being pressed against a fitting.
 
+## Settings
+
+**Select** opens them. Everything is on the watch rather than on a phone,
+because the moment you want to calibrate is aboard, out of range, having just
+noticed a flat calm reading 0.1 m.
+
+- **Boat length** — 5 to 12 m. Only ever used to warn you when the measured
+  period drops below what your hull follows; it never scales the answer.
+- **Units** — metres or feet.
+- **Noise floor** — put the watch down on something solid and leave it for about
+  a minute and a half. It measures its own sensor noise and stores it, which is
+  what lets a flat calm read "calm". Quality gating stays on during this, so if
+  you hold the watch instead the segments are discarded and the count stops
+  advancing rather than quietly calibrating against your hand tremor.
+- **Diagnostic** — accepts every segment regardless of quality. Needed for the
+  bench test where you shake the watch at a fixed period, which otherwise trips
+  the motion gate on every segment. Leave it off for real measurements.
+
 ## Accuracy
 
 Against synthetic seas of known height, the estimator sits within a few percent
@@ -122,11 +140,9 @@ Expect ±40% against a reference buoy in ordinary conditions, and treat the numb
 as "about 1.5 m", not "1.47 m".
 
 In a flat calm it reads **calm** rather than a number — but only once the noise
-floor has been calibrated on a still watch, because sensor noise alone accounts
-for about 0.07 m of apparent height. **That calibration cannot be entered yet:
-there is no settings screen, so the noise floor is currently fixed at zero and a
-still watch will show roughly 0.1 m rather than "calm".** Boat length and the
-choice of feet are stuck at their defaults for the same reason. See "Status".
+floor has been calibrated, because sensor noise alone accounts for about 0.07 m
+of apparent height. Run **Settings → Noise floor** once, with the watch resting
+on something solid; until then a still watch shows roughly 0.1 m instead.
 
 ## Building
 
@@ -150,11 +166,12 @@ sea does not come with an answer key.
 cd test && make check
 ```
 
-26 groups covering the FFT, spectral normalisation, detrending, the noise floor,
+29 groups covering the FFT, spectral normalisation, detrending, the noise floor,
 the leakage-corrected integration weights, decimation droop, gravity projection
 against the rejected alternative, the lever-arm artefact, quality gating
 (including that it does *not* reject rough seas), Welch accumulation, and the
-state machine including persistence and its rejection paths.
+state machine including persistence and its rejection paths, and noise-floor
+calibration.
 
 Several are difference tests rather than absolute bands, because an absolute band
 often passes with the feature deleted. Removing the leakage correction fails 6
@@ -183,16 +200,16 @@ comparison against buoy data has not been done yet.
 
 Known gaps:
 
-- **No settings screen.** `boat_length_m`, `use_feet`, `diagnostic_mode` and the
-  calibrated `noise_floor` can be read from persistent storage but never written,
-  so all four sit at their defaults. The consequences are that a still watch
-  reads about 0.1 m instead of "calm", the short-wave warning always assumes a
-  10 m boat, feet are unreachable, and the bench test that needs the quality gate
-  bypassed cannot be run on the watch.
 - **Raw logging is unverified on hardware.** Whether the DataLogging API works on
   this firmware is the first thing the on-device spike checks. If it is not
   running, the screen shows **no raw log** so the failure is visible before
   leaving harbour rather than after.
+- **Calibration is verified on the host, not in the emulator.** The emulator's
+  accelerometer injection caps at 255 samples per call and its packets stop
+  decoding when they are fed back to back, so a 90-second calibration run cannot
+  be driven through it. The logic is covered by host tests instead, including
+  that a still watch calibrates to within a few percent of the expected noise
+  power and that a held watch refuses to complete.
 
 See `docs/plans/2026-09-06-pebble-wave-height.md` for the full design, the
 alternatives that were rejected and why, and what remains open.

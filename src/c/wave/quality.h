@@ -48,6 +48,21 @@
  * treated as contaminated by body motion. */
 #define WAVE_Q_HF_RATIO_MAX 0.3f
 
+/* Absolute floor on the high-frequency power, in (milli-g)^2, below which a
+ * segment is accepted whatever the ratio says.
+ *
+ * The ratio silently assumes there are waves to compare against. On a still
+ * watch there are none: sensor noise is white, so the high-frequency and
+ * wave-band powers come out comparable and the ratio sits near 1 with nothing
+ * moving at all -- every segment rejected. That is not academic, it is exactly
+ * the condition noise-floor calibration runs in, and without this floor
+ * calibration can never complete.
+ *
+ * 100 (mG)^2 is 10 mG rms, several times the assumed sensor noise (which
+ * contributes about 7) and well below any real hand movement (a 400 mG shake is
+ * 80000). */
+#define WAVE_Q_HF_ABSOLUTE_MIN 100.0f
+
 /* Maximum drift of the gravity direction across one segment, in degrees. */
 #define WAVE_Q_DRIFT_DEG_MAX 2.0f
 

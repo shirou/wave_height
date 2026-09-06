@@ -233,3 +233,27 @@ bool wave_accum_result(const wave_accumulator *a, wave_result *out) {
   out->valid = true;
   return true;
 }
+
+float wave_accum_noise_estimate(const wave_accumulator *a) {
+  if (a->n_seg < 1) {
+    return 0.0f;
+  }
+
+  float band[WAVE_BAND_BINS];
+  int m = 0;
+  for (int k = WAVE_BIN_LO; k <= WAVE_BIN_HI; k++) {
+    band[m++] = a->s_avg[k];
+  }
+
+  /* Insertion sort: fifteen elements, once, at the end of a calibration run. */
+  for (int i = 1; i < m; i++) {
+    const float v = band[i];
+    int j = i - 1;
+    while (j >= 0 && band[j] > v) {
+      band[j + 1] = band[j];
+      j--;
+    }
+    band[j + 1] = v;
+  }
+  return band[m / 2];
+}

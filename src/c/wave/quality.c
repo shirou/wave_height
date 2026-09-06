@@ -105,6 +105,13 @@ float wave_quality_hf_ratio(const wave_quality *q) {
   }
   const float hf_power = q->hf_sum_sq / (float)q->hf_count;
 
+  /* Nothing is moving, so there is nothing to reject -- regardless of what the
+   * ratio would say. Without this a still watch rejects every segment, because
+   * white noise makes the two powers comparable. */
+  if (hf_power < WAVE_Q_HF_ABSOLUTE_MIN) {
+    return 0.0f;
+  }
+
   /* Variance, not mean square: the decimated stream still carries any residual
    * DC offset from the projection, and that is not wave energy. */
   const float mean = q->band_sum / (float)q->band_count;
@@ -133,6 +140,10 @@ float wave_quality_live_ratio(const wave_quality *q) {
   /* No reference yet means no segment has completed, so there is nothing stable
    * to compare against and we stay quiet rather than guess. */
   if (!q->has_reference) {
+    return 0.0f;
+  }
+  /* Same absolute floor as the per-segment ratio: no motion, no warning. */
+  if (q->live_hf_power < WAVE_Q_HF_ABSOLUTE_MIN) {
     return 0.0f;
   }
   const float denom = (q->ref_band_var > WAVE_Q_MIN_REF_VAR)

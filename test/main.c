@@ -38,6 +38,8 @@ void test_session(void);
 void test_session_first_reading(void);
 void test_session_persist(void);
 void test_session_ema(void);
+void test_calibration(void);
+void test_calibration_rejects_motion(void);
 void test_quality_detect(void);
 void test_quality_clip(void);
 void test_quality_vibrate(void);
@@ -75,6 +77,8 @@ int main(int argc, char **argv) {
       {"session", test_session},
       {"session_persist", test_session_persist},
       {"session_ema", test_session_ema},
+      {"calibration", test_calibration},
+      {"calibration_rejects_motion", test_calibration_rejects_motion},
       {"quality_detect", test_quality_detect},
       {"quality_clip", test_quality_clip},
       {"quality_vibrate", test_quality_vibrate},
