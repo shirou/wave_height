@@ -1,0 +1,28 @@
+{
+  "name": "wave-height",
+  "author": "shirou",
+  "version": "0.1.0",
+  "keywords": ["pebble-app", "marine", "waves"],
+  "private": true,
+  "dependencies": {},
+  "pebble": {
+    "displayName": "Wave Height",
+    "uuid": "8f7cb26e-0699-489a-8916-dfce2c3d279a",
+    "sdkVersion": "3",
+    "enableMultiJS": true,
+    "targetPlatforms": [
+      "emery"
+    ],
+    "watchapp": {
+      "watchface": false
+    },
+    "messageKeys": [
+      "logChunk",
+      "logSeq"
+    ],
+    "resources": {
+      "media": []
+    },
+    "capabilities": []
+  }
+}

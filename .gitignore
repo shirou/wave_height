@@ -1,0 +1,11 @@
+# Pebble build output
+build/
+.lock-waf*
+*.pbw
+
+# Host test build
+test/run_tests
+test/gen_emu_accel
+test/analyze_csv
+*.o
+*.d
