@@ -83,7 +83,19 @@
  * Expressed as a cosine, because comparing cosines needs no inverse
  * trigonometry -- see wave_vec3_angle_exceeds. cos(35 degrees). */
 #define WAVE_G_RESET_COS 0.8191520f
-#define WAVE_G_RESET_HOLD_S 1.0f
+
+/* How long the input has to stay off-axis before settling restarts.
+ *
+ * One second was too short. Raising the wrist to read the display swings the
+ * instantaneous vector well past 35 degrees for about that long, so every
+ * glance at the number restarted the estimate and no segment ever completed --
+ * seen on hardware as the state flipping back to settling at 57 s with the
+ * segment count still zero. Since reading the display is the whole point of
+ * the app, the check has to tolerate it.
+ *
+ * Four seconds still catches an actual reposition, which involves lifting the
+ * hand, moving it and putting it down again. */
+#define WAVE_G_RESET_HOLD_S 4.0f
 
 /* Below this magnitude the direction is meaningless and projection would divide
  * by something close to zero. Free fall or a bad synthetic input looks like this. */

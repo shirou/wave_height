@@ -150,24 +150,35 @@ static void update_proc(Layer *layer, GContext *ctx) {
   }
 
   /* ---- period and one-tenth height ---- */
-  char sub[40];
+  /* Two lines rather than one. At 24 px "Period 16s  1/10 0.0m" would wrap,
+   * and a wrapped line reads worse than a smaller one -- so the content is
+   * split deliberately instead of being left to the layout engine. */
+  char sub1[24];
+  char sub2[24];
   if (!s_rate_ok) {
-    snprintf(sub, sizeof(sub), "Wrong sample rate");
+    snprintf(sub1, sizeof(sub1), "Wrong sample");
+    snprintf(sub2, sizeof(sub2), "rate");
   } else if (d->result.valid && d->result.period > 0.0f) {
     /* Whole seconds only: the single-segment spread of Tm-1,0 is about 0.57 s,
      * so a decimal place would be fiction. */
-    const int period_s = (int)(d->result.period + 0.5f);
+    snprintf(sub1, sizeof(sub1), "Period %ds", (int)(d->result.period + 0.5f));
     char tenth[16];
     format_1dp(tenth, sizeof(tenth),
                wh_display_height(s_cfg, d->result.h_one_tenth));
-    snprintf(sub, sizeof(sub), "Period %ds   1/10 %s%s", period_s, tenth,
-             wh_height_unit(s_cfg));
+    snprintf(sub2, sizeof(sub2), "1/10 %s%s", tenth, wh_height_unit(s_cfg));
   } else {
-    sub[0] = '\0';
+    sub1[0] = 0;
+    sub2[0] = 0;
   }
-  graphics_draw_text(ctx, sub, fonts_get_system_font(FONT_KEY_GOTHIC_18),
-                     GRect(b.origin.x + 6, b.origin.y + 146, b.size.w - 12, 24),
-                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+  GFont sub_font = fonts_get_system_font(FONT_KEY_GOTHIC_24);
+  graphics_draw_text(ctx, sub1, sub_font,
+                     GRect(b.origin.x + 4, b.origin.y + 110, b.size.w - 8, 30),
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter,
+                     NULL);
+  graphics_draw_text(ctx, sub2, sub_font,
+                     GRect(b.origin.x + 4, b.origin.y + 137, b.size.w - 8, 30),
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter,
+                     NULL);
 
   /* ---- short-wave warning ----
    *
@@ -176,9 +187,9 @@ static void update_proc(Layer *layer, GContext *ctx) {
   if (d->result.valid && d->result.period > 0.0f &&
       d->result.period < wh_follow_limit_period(s_cfg)) {
     graphics_context_set_text_color(ctx, GColorRed);
-    graphics_draw_text(ctx, "Short waves: may read low",
-                       fonts_get_system_font(FONT_KEY_GOTHIC_14),
-                       GRect(b.origin.x + 6, b.origin.y + 170, b.size.w - 12, 20),
+    graphics_draw_text(ctx, "Short waves - reads low",
+                       fonts_get_system_font(FONT_KEY_GOTHIC_18),
+                       GRect(b.origin.x + 4, b.origin.y + 168, b.size.w - 8, 24),
                        GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter,
                        NULL);
     graphics_context_set_text_color(ctx, GColorBlack);
@@ -189,10 +200,10 @@ static void update_proc(Layer *layer, GContext *ctx) {
   char timebuf[16];
   snprintf(timebuf, sizeof(timebuf), "%d:%02d", secs / 60, secs % 60);
 
-  const int bar_x = b.origin.x + 8;
-  const int bar_y = b.origin.y + b.size.h - 26;
-  const int bar_w = b.size.w - 70;
-  const int bar_h = 8;
+  const int bar_x = b.origin.x + 6;
+  const int bar_y = b.origin.y + b.size.h - 24;
+  const int bar_w = b.size.w - 84;
+  const int bar_h = 10;
 
   graphics_context_set_stroke_color(ctx, GColorDarkGray);
   graphics_draw_rect(ctx, GRect(bar_x, bar_y, bar_w, bar_h));
@@ -208,8 +219,8 @@ static void update_proc(Layer *layer, GContext *ctx) {
                      0, GCornerNone);
 
   graphics_context_set_text_color(ctx, GColorBlack);
-  graphics_draw_text(ctx, timebuf, fonts_get_system_font(FONT_KEY_GOTHIC_18),
-                     GRect(bar_x + bar_w + 4, bar_y - 8, 58, 24),
+  graphics_draw_text(ctx, timebuf, fonts_get_system_font(FONT_KEY_GOTHIC_24),
+                     GRect(bar_x + bar_w + 4, bar_y - 11, 76, 30),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
 
   /* Raw logging is the only way to work out afterwards why a sea trial
@@ -220,7 +231,7 @@ static void update_proc(Layer *layer, GContext *ctx) {
     graphics_context_set_text_color(ctx, GColorRed);
     graphics_draw_text(ctx, "no raw log",
                        fonts_get_system_font(FONT_KEY_GOTHIC_14),
-                       GRect(bar_x, bar_y + 10, bar_w, 16),
+                       GRect(bar_x, bar_y + 12, bar_w, 16),
                        GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft,
                        NULL);
   }
