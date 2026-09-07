@@ -67,6 +67,11 @@ rolling.
 - **Measure while lying to or drifting, not under way.** Making way shifts the
   encounter period: at 10 knots in a real 6 s sea, the period reads 3.9 s head-on
   and 13.3 s following. Hs survives; the period does not.
+- **Engine vibration is not subtracted.** The noise floor is calibrated ashore,
+  so it accounts for the sensor and nothing else. Vibration that reaches the
+  0.063–0.5 Hz band while the engine runs adds to the reading. If you see the
+  height change when the engine starts, that is what you are looking at — there
+  is no compensation for it yet.
 - **Turn on Quiet Time.** A notification buzz invalidates the segment it lands
   in, and on a boat Bluetooth reconnects can fire them repeatedly.
 
@@ -121,6 +126,16 @@ noticed a flat calm reading 0.1 m.
   what lets a flat calm read "calm". Quality gating stays on during this, so if
   you hold the watch instead the segments are discarded and the count stops
   advancing rather than quietly calibrating against your hand tremor.
+
+  **Do this ashore, on a table — not afloat.** What it measures is the sensor's
+  own noise, which only works where there is no wave energy to confuse it with.
+  Calibrating in a swell records that swell as noise and subtracts it from every
+  later measurement, which makes real seas read low.
+
+  Once is enough; the value is stored. Measured on a Pebble Time 2 it comes out
+  around 1.1e-3, about seven times the figure this app was designed around, so
+  running it genuinely matters — without it a still watch reads about 0.17 m
+  instead of "calm".
 - **Diagnostic** — accepts every segment regardless of quality. Needed for the
   bench test where you shake the watch at a fixed period, which otherwise trips
   the motion gate on every segment. Leave it off for real measurements.
