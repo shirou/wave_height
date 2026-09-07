@@ -16,10 +16,10 @@
 
 #include "spectrum.h"
 
-#include <math.h>
 #include <stdbool.h>
 
 #include "decimate.h"
+#include "fastmath.h"
 #include "fft.h"
 
 #ifndef M_PI
@@ -61,7 +61,7 @@ static void build_window(void) {
   s_win_pow_sum = 0.0f;
   for (int i = 0; i < WAVE_SEG_SAMPLES; i++) {
     /* Periodic (divide by N, not N-1) so that sum(w^2) is exactly 3N/8. */
-    s_win[i] = 0.5f * (1.0f - cosf(2.0f * (float)M_PI * (float)i /
+    s_win[i] = 0.5f * (1.0f - wave_cosf(2.0f * (float)M_PI * (float)i /
                                    (float)WAVE_SEG_SAMPLES));
     s_win_pow_sum += s_win[i] * s_win[i];
   }

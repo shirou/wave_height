@@ -17,8 +17,9 @@
 #include "settings_window.h"
 
 #include <pebble.h>
-#include <math.h>
 #include <stdio.h>
+
+#include "wave/fastmath.h"
 
 /* Lengths offered, in metres. The app is only honest up to about 12 m -- beyond
  * that the boat stops following the waves and the reading is an underestimate
@@ -137,7 +138,7 @@ static void calib_finish(void) {
    * clamping real seas away as "calm", and then vanish silently at the next
    * launch. Refusing it outright keeps the write side and the read side in
    * agreement, and tells the user their calibration did not take. */
-  const bool ok = isfinite(s_calib_value) && s_calib_value >= 0.0f &&
+  const bool ok = wave_isfinite(s_calib_value) && s_calib_value >= 0.0f &&
                   s_calib_value <= WH_NOISE_FLOOR_MAX;
 
   if (ok) {

@@ -139,6 +139,7 @@ static void update_proc(Layer *layer, GContext *ctx) {
   const bool numeric = (d->result.valid && s_rate_ok);
   GFont big = numeric ? fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS)
                       : fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD);
+
   graphics_draw_text(ctx, num, big,
                      GRect(b.origin.x, b.origin.y + 62, b.size.w - 48, 56),
                      GTextOverflowModeWordWrap, GTextAlignmentRight, NULL);

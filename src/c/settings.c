@@ -16,8 +16,9 @@
 
 #include "settings.h"
 
-#include <math.h>
 #include <pebble.h>
+
+#include "wave/fastmath.h"
 
 #define WH_PERSIST_KEY_SETTINGS 1
 
@@ -63,7 +64,7 @@ void wh_settings_save(const wh_settings *s) {
 float wh_follow_limit_period(const wh_settings *s) {
   /* T_min = sqrt(4*pi*L/g) */
   const float g = 9.80665f;
-  return sqrtf(4.0f * 3.14159265f * s->boat_length_m / g);
+  return wave_sqrtf(4.0f * 3.14159265f * s->boat_length_m / g);
 }
 
 float wh_display_height(const wh_settings *s, float metres) {

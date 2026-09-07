@@ -24,6 +24,11 @@ const char *g_current_test = NULL;
 
 void test_fft(void);
 void test_rate_check(void);
+void test_fastmath_sqrt(void);
+void test_fastmath_trig(void);
+void test_fastmath_floor(void);
+void test_fastmath_isfinite(void);
+void test_fastmath_angle(void);
 void test_detrend(void);
 void test_spectrum(void);
 void test_spectrum_longperiod(void);
@@ -63,6 +68,11 @@ int main(int argc, char **argv) {
   static const test_entry tests[] = {
       {"fft", test_fft},
       {"rate_check", test_rate_check},
+      {"fastmath_sqrt", test_fastmath_sqrt},
+      {"fastmath_trig", test_fastmath_trig},
+      {"fastmath_floor", test_fastmath_floor},
+      {"fastmath_isfinite", test_fastmath_isfinite},
+      {"fastmath_angle", test_fastmath_angle},
       {"detrend", test_detrend},
       {"spectrum", test_spectrum},
       {"spectrum_longperiod", test_spectrum_longperiod},

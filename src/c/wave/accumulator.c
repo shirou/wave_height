@@ -16,8 +16,9 @@
 
 #include "accumulator.h"
 
-#include <math.h>
 #include <string.h>
+
+#include "fastmath.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -213,20 +214,20 @@ bool wave_accum_result(const wave_accumulator *a, wave_result *out) {
     m_minus1 += s_w_mm1[i] * resid * WAVE_DF;
   }
 
-  if (!(m0 > 0.0f) || !isfinite(m0)) {
+  if (!(m0 > 0.0f) || !wave_isfinite(m0)) {
     /* Flat calm, or everything clamped away. Not an error. */
     return false;
   }
 
-  out->hs = 4.0f * sqrtf(m0);
+  out->hs = 4.0f * wave_sqrtf(m0);
   out->h_one_tenth = WAVE_H_ONE_TENTH_RATIO * out->hs;
 
   /* Tm-1,0 rather than a peak-picked Tp: argmax hops between bins because each
    * bin is chi-square with 2 dof, giving sd 1.00 s at one segment, whereas this
    * energy-weighted mean lands in the same range with sd 0.57 s. */
-  out->period = (isfinite(m_minus1) && m_minus1 > 0.0f) ? (m_minus1 / m0) : 0.0f;
+  out->period = (wave_isfinite(m_minus1) && m_minus1 > 0.0f) ? (m_minus1 / m0) : 0.0f;
 
-  if (!isfinite(out->hs) || !isfinite(out->h_one_tenth)) {
+  if (!wave_isfinite(out->hs) || !wave_isfinite(out->h_one_tenth)) {
     return false;
   }
 

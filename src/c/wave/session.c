@@ -16,8 +16,9 @@
 
 #include "session.h"
 
-#include <math.h>
 #include <string.h>
+
+#include "fastmath.h"
 
 #include "spectrum.h"
 
@@ -151,7 +152,7 @@ void wave_session_set_noise_floor(wave_session *s, float noise_floor) {
 
 float wave_session_round_hs(float hs, wave_confidence conf) {
   const float step = (conf <= WAVE_CONF_LOW) ? 0.5f : 0.1f;
-  return floorf(hs / step + 0.5f) * step;
+  return wave_floorf(hs / step + 0.5f) * step;
 }
 
 void wave_session_get_display(const wave_session *s, wave_display *out) {
@@ -200,7 +201,7 @@ bool wave_session_restore(wave_session *s, const wave_session_snapshot *snap,
   /* One NaN would poison the exponential average permanently, and so, nearly as
    * badly, would a finite-but-absurd value. */
   for (int k = 0; k < WAVE_NBINS; k++) {
-    if (!isfinite(snap->s_avg[k]) || snap->s_avg[k] < 0.0f ||
+    if (!wave_isfinite(snap->s_avg[k]) || snap->s_avg[k] < 0.0f ||
         snap->s_avg[k] > WAVE_SNAPSHOT_MAX_PSD) {
       return false;
     }

@@ -16,34 +16,35 @@
 
 #include "gravity.h"
 
-#include <math.h>
 #include <string.h>
 
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
-
-static float vec3_norm(wave_vec3 v) {
-  return sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
-}
+#include "fastmath.h"
 
 static float vec3_dot(wave_vec3 a, wave_vec3 b) {
   return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
-float wave_vec3_angle_deg(wave_vec3 a, wave_vec3 b) {
-  const float na = vec3_norm(a);
-  const float nb = vec3_norm(b);
-  if (na < 1e-6f || nb < 1e-6f) {
-    return 0.0f;
+static float vec3_norm(wave_vec3 v) {
+  return wave_sqrtf(vec3_dot(v, v));
+}
+
+bool wave_vec3_angle_exceeds(wave_vec3 a, wave_vec3 b, float cos_limit) {
+  const float n2a = vec3_dot(a, a);
+  const float n2b = vec3_dot(b, b);
+  if (n2a <= 0.0f || n2b <= 0.0f) {
+    return false;
   }
-  float c = vec3_dot(a, b) / (na * nb);
-  if (c > 1.0f) {
-    c = 1.0f;
-  } else if (c < -1.0f) {
-    c = -1.0f;
+
+  const float d = vec3_dot(a, b);
+
+  /* Obtuse already: wider than any positive-cosine limit. */
+  if (d <= 0.0f) {
+    return cos_limit > 0.0f;
   }
-  return acosf(c) * 180.0f / (float)M_PI;
+
+  /* Want: d / sqrt(n2a * n2b) < cos_limit. Both sides are positive here, so
+   * squaring is safe and removes the root. */
+  return (d * d) < (cos_limit * cos_limit * n2a * n2b);
 }
 
 void wave_gravity_init(wave_gravity *g, float sample_rate_hz) {
@@ -98,7 +99,7 @@ void wave_gravity_push(wave_gravity *g, wave_vec3 a_mg) {
   /* Restart settling if the watch has clearly been repositioned. Roll and wave
    * motion swing the instantaneous vector around the estimate but come back; a
    * new posture does not. */
-  if (wave_vec3_angle_deg(a_mg, g->g_hat) > WAVE_G_RESET_DEG) {
+  if (wave_vec3_angle_exceeds(a_mg, g->g_hat, WAVE_G_RESET_COS)) {
     g->t_off_axis += g->dt;
     if (g->t_off_axis >= WAVE_G_RESET_HOLD_S) {
       restart_settling(g);

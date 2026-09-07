@@ -16,8 +16,9 @@
 
 #include "fft.h"
 
-#include <math.h>
 #include <stdbool.h>
+
+#include "fastmath.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -32,9 +33,9 @@ static bool s_tw_ready = false;
 
 static void build_twiddles(void) {
   for (int i = 0; i < WAVE_FFT_MAX_N / 2; i++) {
-    const double ang = -2.0 * M_PI * (double)i / (double)WAVE_FFT_MAX_N;
-    s_tw_re[i] = (float)cos(ang);
-    s_tw_im[i] = (float)sin(ang);
+    const float ang = -2.0f * (float)M_PI * (float)i / (float)WAVE_FFT_MAX_N;
+    s_tw_re[i] = wave_cosf(ang);
+    s_tw_im[i] = wave_sinf(ang);
   }
   s_tw_ready = true;
 }

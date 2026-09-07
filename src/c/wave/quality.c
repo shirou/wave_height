@@ -16,10 +16,10 @@
 
 #include "quality.h"
 
-#include <math.h>
 #include <string.h>
 
-#include "gravity.h" /* wave_vec3_angle_deg */
+#include "fastmath.h"
+#include "gravity.h" /* wave_vec3_angle_exceeds */
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -67,7 +67,7 @@ void wave_quality_push_raw(wave_quality *q, wave_vec3 a_mg, float a_vert_mg,
   }
 
   const float t = q->clip_threshold_mg;
-  if (fabsf(a_mg.x) >= t || fabsf(a_mg.y) >= t || fabsf(a_mg.z) >= t) {
+  if (wave_fabsf(a_mg.x) >= t || wave_fabsf(a_mg.y) >= t || wave_fabsf(a_mg.z) >= t) {
     q->clipped = true;
   }
 
@@ -159,7 +159,7 @@ wave_quality_verdict wave_quality_verdict_of(const wave_quality *q) {
   if (q->clipped) {
     return WAVE_Q_FAIL_CLIP;
   }
-  if (wave_vec3_angle_deg(q->g_start, q->g_end) > WAVE_Q_DRIFT_DEG_MAX) {
+  if (wave_vec3_angle_exceeds(q->g_start, q->g_end, WAVE_Q_DRIFT_COS)) {
     return WAVE_Q_FAIL_DRIFT;
   }
   if (wave_quality_hf_ratio(q) > WAVE_Q_HF_RATIO_MAX) {

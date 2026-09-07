@@ -66,8 +66,9 @@
  * enough to matter. */
 #define WAVE_Q_HF_ABSOLUTE_MIN 100.0f
 
-/* Maximum drift of the gravity direction across one segment, in degrees. */
-#define WAVE_Q_DRIFT_DEG_MAX 2.0f
+/* Maximum drift of the gravity direction across one segment, as a cosine (see
+ * wave_vec3_angle_exceeds). cos(2 degrees). */
+#define WAVE_Q_DRIFT_COS 0.9993908f
 
 /* Minimum decimated samples before the per-segment ratio means anything. A
  * variance over two or three samples is noise, not a measurement. */

@@ -16,8 +16,9 @@
 
 #include "decimate.h"
 
-#include <math.h>
 #include <string.h>
+
+#include "fastmath.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -46,11 +47,11 @@ float wave_decim_droop_gain2(float f_hz) {
     return 1.0f;
   }
   const float d = (float)M_PI * f_hz / fs_in;
-  const float sd = sinf(d);
-  if (fabsf(sd) < 1e-9f) {
+  const float sd = wave_sinf(d);
+  if (wave_fabsf(sd) < 1e-9f) {
     return 1.0f;
   }
-  const float h = sinf((float)m * d) / ((float)m * sd);
+  const float h = wave_sinf((float)m * d) / ((float)m * sd);
   const float g2 = h * h;
 
   /* The sinc has nulls at multiples of fs_in/m, and callers divide by this. No

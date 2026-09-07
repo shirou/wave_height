@@ -76,10 +76,13 @@
 /* A genuine change of posture -- the user lifting their hand and putting it back
  * somewhere else -- has to restart settling, otherwise the slow constant takes
  * over 90 s to follow it. Detected as the instantaneous acceleration sitting far
- * off the current estimate for a sustained period. The angle threshold is well
- * above anything roll produces (the wave-induced tilt of a small boat rarely
- * exceeds 20 degrees) so that ordinary motion does not trip it. */
-#define WAVE_G_RESET_DEG 35.0f
+ * off the current estimate for a sustained period. The threshold is well above
+ * anything roll produces (the wave-induced tilt of a small boat rarely exceeds
+ * 20 degrees) so that ordinary motion does not trip it.
+ *
+ * Expressed as a cosine, because comparing cosines needs no inverse
+ * trigonometry -- see wave_vec3_angle_exceeds. cos(35 degrees). */
+#define WAVE_G_RESET_COS 0.8191520f
 #define WAVE_G_RESET_HOLD_S 1.0f
 
 /* Below this magnitude the direction is meaningless and projection would divide
@@ -113,7 +116,16 @@ bool wave_gravity_converged(const wave_gravity *g);
  * Returns false if the estimate is unusable. */
 bool wave_gravity_project(const wave_gravity *g, wave_vec3 a_mg, float *out_mg);
 
-/* Angle between two vectors in degrees; 0 if either is degenerate. */
-float wave_vec3_angle_deg(wave_vec3 a, wave_vec3 b);
+/*
+ * True if the angle between a and b is wider than the angle whose cosine is
+ * cos_limit. False if either vector is degenerate.
+ *
+ * Phrased as a comparison rather than returning an angle so that no arc cosine
+ * is needed, and squared internally so that no square root is either: every
+ * caller only ever wanted to test a threshold. This matters because libm is
+ * unusable on the watch (see fastmath.h) and because it keeps the hot path --
+ * this runs on every sample -- down to multiplies and one compare.
+ */
+bool wave_vec3_angle_exceeds(wave_vec3 a, wave_vec3 b, float cos_limit);
 
 #endif /* WAVE_GRAVITY_H */
