@@ -83,6 +83,11 @@ typedef struct {
   float burst_end_s;
   float burst_amp_mg;
   float burst_freq_hz;
+  /* A hole punched in the burst. Machinery is not a square wave: an engine's
+   * amplitude wanders with load and idle hunting, and the vibration warning has
+   * to survive that without needing to re-earn itself. Zero-width disables. */
+  float burst_gap_start_s;
+  float burst_gap_end_s;
 } synth_config;
 
 #define SYNTH_MAX_COMPONENTS WAVE_NBINS

@@ -133,6 +133,37 @@ void wave_session_push(wave_session *s, const wave_accel_sample *samples,
    * boundary and spikes for the first seconds of a new segment. */
   s->live_hf_ratio = wave_quality_live_ratio(&s->qual);
 
+  /* Sustained vibration. The ratio is already normalised by the sea state, so
+   * what is left to establish is that the contamination does not stop -- which
+   * is the only thing that separates machinery from the user's own hand. */
+  const float batch_s = (float)n * s->dt;
+  const bool high = (s->live_hf_ratio > WAVE_Q_LIVE_RATIO_WARN);
+  if (high) {
+    s->t_vib_quiet = 0.0f;
+    /* The ratio is evaluated once per batch, so a batch that ends high may have
+     * spent most of itself low. Crediting all of it would let the hold time be
+     * satisfied up to a batch early -- 2.5 s on the watch, which subscribes for
+     * 25 samples at 10 Hz. Skip the crossing batch instead: being late costs
+     * nothing, being early weakens the one claim this warning rests on. */
+    if (s->vib_high_prev) {
+      s->t_vib_high += batch_s;
+      if (s->t_vib_high >= WAVE_Q_VIB_HOLD_S) {
+        s->engine_vib = true;
+      }
+    }
+  } else {
+    s->t_vib_quiet += batch_s;
+    if (s->engine_vib) {
+      if (s->t_vib_quiet >= WAVE_Q_VIB_HOLD_S) {
+        s->engine_vib = false;
+        s->t_vib_high = 0.0f;
+      }
+    } else if (s->t_vib_quiet >= WAVE_Q_VIB_GAP_S) {
+      s->t_vib_high = 0.0f;
+    }
+  }
+  s->vib_high_prev = high;
+
   /* Leave PAUSED as soon as the motion actually stops.
    *
    * Clearing it only on the next successful segment made the warning unclearable
@@ -171,6 +202,7 @@ void wave_session_get_display(const wave_session *s, wave_display *out) {
   out->warn_hold_still = (s->state == WAVE_STATE_PAUSED) ||
                          (s->live_hf_ratio > WAVE_Q_LIVE_RATIO_WARN);
   out->warn_reposition = (s->rejected_run >= WAVE_REPOSITION_AFTER);
+  out->warn_engine_vib = s->engine_vib;
 }
 
 void wave_session_save(const wave_session *s, wave_session_snapshot *out,

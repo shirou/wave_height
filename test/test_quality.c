@@ -315,3 +315,299 @@ void test_quality_small_motion(void) {
         "floor may be set too high",
         rate * 100.0);
 }
+
+/*
+ * Machinery vibration: detected, not corrected.
+ *
+ * The noise floor is calibrated ashore, so it covers the sensor and nothing
+ * else. Engine vibration that reaches the integration band is added to the
+ * height with nothing to offset it, and it cannot be subtracted -- in-band
+ * vibration is indistinguishable from wave energy, and estimating it from the
+ * high-frequency end is the same mistake as estimating the noise floor that
+ * way. So the user is told instead.
+ *
+ * The first implementation compared the absolute high-frequency level against
+ * the still-watch level from calibration. That is what these tests exist to
+ * stop coming back: a clean Hs 2 m sea, with no vibration anywhere in it, fired
+ * the warning on most batches while the app reported the height correctly.
+ * Because the 1 Hz high pass passes a good fraction of the wave band, the
+ * absolute level tracks the sea state, so the comparison has to be against the
+ * sea state -- which is what the live ratio already does.
+ */
+
+typedef struct {
+  float onset_s;            /* when the warning first appeared, -1 if never */
+  bool coincided_with_move; /* was a movement warning up at the same time --
+                             * which is what makes the display ordering in
+                             * status_text load-bearing */
+  bool cleared_after_onset; /* did it drop again once it had appeared */
+  bool dipped_after_onset;  /* did the ratio itself fall back under the
+                             * threshold -- without this the dip test would
+                             * quietly stop exercising the latch */
+  float max_ratio;
+} vib_trace;
+
+static vib_trace run_vib(const synth_config *cfg, double seconds) {
+  synth_t syn;
+  synth_init(&syn, cfg, WAVE_ACQ_RATE_HZ);
+
+  wave_session s;
+  wave_session_init(&s, WAVE_ACQ_RATE_HZ, 0.0f, 4000.0f);
+
+  vib_trace tr;
+  tr.onset_s = -1.0f;
+  tr.coincided_with_move = false;
+  tr.cleared_after_onset = false;
+  tr.dipped_after_onset = false;
+  tr.max_ratio = 0.0f;
+
+  const int total = (int)(seconds * WAVE_ACQ_RATE_HZ + 0.5);
+  wave_accel_sample buf[BATCH];
+  int held = 0;
+  for (int i = 0; i < total; i++) {
+    synth_next(&syn, &buf[held++]);
+    if (held < BATCH) {
+      continue;
+    }
+    wave_session_push(&s, buf, held);
+    held = 0;
+
+    if (s.live_hf_ratio > tr.max_ratio) {
+      tr.max_ratio = s.live_hf_ratio;
+    }
+    if (tr.onset_s >= 0.0f && s.live_hf_ratio <= WAVE_Q_LIVE_RATIO_WARN) {
+      tr.dipped_after_onset = true;
+    }
+    wave_display d;
+    wave_session_get_display(&s, &d);
+    if (d.warn_engine_vib) {
+      if (tr.onset_s < 0.0f) {
+        tr.onset_s = s.elapsed_s;
+      }
+      if (d.warn_hold_still || d.warn_reposition) {
+        tr.coincided_with_move = true;
+      }
+    } else if (tr.onset_s >= 0.0f) {
+      tr.cleared_after_onset = true;
+    }
+  }
+  return tr;
+}
+
+/* A sea with an engine running in it from the given time onwards. */
+static void vib_sea(synth_config *c, float hs, float tp, unsigned seed) {
+  synth_default_config(c);
+  c->hs = hs;
+  c->tp = tp;
+  c->noise_sigma_mg = 7.6f; /* the level hardware actually shows */
+  c->quantize_1mg = true;
+  c->seed = seed;
+  c->burst_freq_hz = 3.0f;
+}
+
+void test_quality_vibration(void) {
+  /* ---- the false positive that the absolute test produced ----
+   *
+   * No vibration at all, across the sea states where the old rule misfired.
+   * Tp is kept short on purpose: a choppy sea is the worst case, because it
+   * puts the most energy near the high-pass corner. */
+  const float hs_cases[] = {0.5f, 1.0f, 2.0f};
+  const float tp_cases[] = {4.0f, 5.0f, 6.0f};
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      synth_config clean;
+      vib_sea(&clean, hs_cases[i], tp_cases[j], 4100u + (unsigned)(i * 3 + j));
+      clean.burst_amp_mg = 0.0f;
+      const vib_trace tr = run_vib(&clean, 150.0);
+      printf("      clean Hs=%.1f Tp=%.0f: max ratio %.2f, warned %s\n",
+             (double)hs_cases[i], (double)tp_cases[j], (double)tr.max_ratio,
+             tr.onset_s >= 0.0f ? "YES" : "no");
+      CHECK(tr.onset_s < 0.0f,
+            "a clean sea must never be reported as engine vibration");
+    }
+  }
+
+  /* ---- an engine that starts once the measurement is under way ----
+   *
+   * After the first segment, not before: the ratio's denominator is the wave
+   * band variance of the last ACCEPTED segment, so nothing can be judged until
+   * one has been accepted. See the limitation pinned at the end of this test. */
+  synth_config eng;
+  vib_sea(&eng, 0.5f, 6.0f, 4200u);
+  eng.burst_amp_mg = 60.0f; /* modest but relentless, as machinery is */
+  eng.burst_start_s = 60.0f;
+  eng.burst_end_s = 1.0e6f;
+  const vib_trace on = run_vib(&eng, 200.0);
+  printf("      engine from %.0fs: onset %.0fs (max ratio %.2f)\n",
+         (double)eng.burst_start_s, (double)on.onset_s, (double)on.max_ratio);
+  CHECK(on.onset_s >= 0.0f, "sustained vibration should raise the warning");
+  /* Pins WAVE_Q_VIB_HOLD_S from below, with no slack: the warning must not
+   * appear until the contamination has genuinely lasted long enough to rule out
+   * a movement. Slack here was hiding a batch-boundary error that credited up
+   * to one whole batch of not-yet-elevated time. */
+  CHECK(on.onset_s >= eng.burst_start_s + WAVE_Q_VIB_HOLD_S,
+        "the warning appeared sooner than the hold time allows");
+  /* And from above: it has to arrive before a contaminated segment completes,
+   * which is the whole reason the hold time is under 32 s. */
+  CHECK(on.onset_s <= eng.burst_start_s + 32.0f,
+        "the warning arrived too late to precede a contaminated segment");
+  /* The display ranks "Vibration" above "Hold still" and "Reposition". That
+   * ordering only matters because the conditions overlap, and it is the overlap
+   * that a host test can pin -- status_text itself needs the SDK. If this ever
+   * stops being true, re-check the ranking in ui.c rather than deleting it. */
+  CHECK(on.coincided_with_move,
+        "vibration no longer coincides with a movement warning, so the display "
+        "ordering in status_text needs revisiting");
+
+  /* ---- the engine's amplitude wandering must not clear the warning ----
+   *
+   * Requiring every batch to be over the threshold meant a 1.5 s dip cleared a
+   * latched warning and demanded another 25 s to earn it back. */
+  synth_config dip = eng;
+  dip.seed = 4201u;
+  dip.burst_gap_start_s = 130.0f;
+  dip.burst_gap_end_s = 142.0f; /* throttled back to idle, then opened up */
+  const vib_trace held = run_vib(&dip, 200.0);
+  CHECK(held.onset_s >= 0.0f, "vibration with a dip should still warn");
+  /* Without this the next check passes for the wrong reason: if the ratio never
+   * actually crosses back under the threshold, the latch is never asked to hold
+   * anything. */
+  CHECK(held.dipped_after_onset,
+        "the dip case is no longer exercising the latch -- lengthen the gap");
+  CHECK(!held.cleared_after_onset,
+        "a twelve-second dip must not clear a latched vibration warning");
+
+  /* ---- and it does clear, once the engine actually stops ----
+   *
+   * Pins the release from the other side. A warning that cannot be cleared is
+   * as bad as one that never appears: the user stops the engine, waits, and has
+   * no way to tell whether the reading is trustworthy again. */
+  synth_config stops = eng;
+  stops.seed = 4202u;
+  stops.burst_end_s = 140.0f;
+  const vib_trace off = run_vib(&stops, 220.0);
+  CHECK(off.onset_s >= 0.0f, "vibration should warn before the engine stops");
+  CHECK(off.cleared_after_onset,
+        "the warning must clear once the engine has been off long enough");
+
+  /* ---- movements, which do stop ---- */
+  synth_config reach;
+  vib_sea(&reach, 0.5f, 6.0f, 4300u);
+  reach.burst_amp_mg = 400.0f; /* far larger than the engine case */
+  reach.burst_start_s = 60.0f;
+  reach.burst_end_s = 70.0f; /* ten seconds: reaching for the throttle */
+  const vib_trace mv = run_vib(&reach, 180.0);
+  printf("      10s movement: max ratio %.2f, warned %s\n",
+         (double)mv.max_ratio, mv.onset_s >= 0.0f ? "YES" : "no");
+  CHECK(mv.onset_s < 0.0f,
+        "a ten-second movement must not be reported as vibration, however "
+        "large");
+
+  /* Repeated movements with real quiet between them must not add up into a
+   * warning either -- what is being established is continuity. */
+  synth_config fidget;
+  vib_sea(&fidget, 0.5f, 6.0f, 4301u);
+  fidget.burst_amp_mg = 400.0f;
+  fidget.burst_start_s = 60.0f;
+  fidget.burst_end_s = 130.0f;
+  fidget.burst_gap_start_s = 68.0f;
+  fidget.burst_gap_end_s = 122.0f; /* one 8 s movement, then a long quiet */
+  const vib_trace fid = run_vib(&fidget, 180.0);
+  CHECK(fid.onset_s < 0.0f,
+        "movements separated by quiet must not accumulate into a warning");
+
+  /* ---- what the detector cannot see at all: machinery below ~1 Hz ----
+   *
+   * The evidence is a 1 Hz high-pass output, so a forced oscillation with no
+   * content above that is invisible to it while still landing squarely in the
+   * 0.063-0.5 Hz integration band. A slow, regular hull motion driven by
+   * machinery is therefore added to the height with no warning at all. This is
+   * the same wall the whole design runs into -- in-band contamination is
+   * indistinguishable from swell -- and it is pinned here so that "Vibration"
+   * is never mistaken for a general contamination detector. */
+  {
+    synth_config slow;
+    vib_sea(&slow, 0.3f, 8.0f, 4500u);
+    slow.burst_freq_hz = 0.25f; /* 4 s period, inside the wave band */
+    slow.burst_amp_mg = 20.0f;
+    slow.burst_start_s = 0.0f;
+    slow.burst_end_s = 1.0e6f;
+
+    synth_t syn;
+    synth_init(&syn, &slow, WAVE_ACQ_RATE_HZ);
+    wave_session s3;
+    wave_session_init(&s3, WAVE_ACQ_RATE_HZ, 0.0f, 4000.0f);
+    wave_accel_sample buf[BATCH];
+    int held3 = 0;
+    bool warned = false;
+    const int total = (int)(200.0 * WAVE_ACQ_RATE_HZ);
+    for (int i = 0; i < total; i++) {
+      synth_next(&syn, &buf[held3++]);
+      if (held3 == BATCH) {
+        wave_session_push(&s3, buf, held3);
+        held3 = 0;
+        wave_display dd;
+        wave_session_get_display(&s3, &dd);
+        if (dd.warn_engine_vib) {
+          warned = true;
+        }
+      }
+    }
+    wave_display d;
+    wave_session_get_display(&s3, &d);
+    printf("      0.25 Hz machinery: Hs %.2f m (true 0.30), warned %s\n",
+           (double)d.result.hs, warned ? "YES" : "no");
+    CHECK(d.result.valid, "the 0.25 Hz case should still produce a height");
+    CHECK(d.result.hs > 0.4f,
+          "the 0.25 Hz tone should be inflating the height -- if it no longer "
+          "does, this limitation test has stopped testing anything");
+    CHECK(!warned,
+          "documented limitation changed: sub-1 Hz machinery now warns, which "
+          "is an improvement -- update this test and the comment above it");
+  }
+
+  /* ---- the known limitation, pinned so nobody assumes it is covered ----
+   *
+   * With the engine already running when the measurement starts, no segment is
+   * ever clean enough to be accepted, so the ratio has no denominator and the
+   * warning cannot fire. What the user gets instead is a measurement that never
+   * completes and a "Reposition" prompt -- unhelpful wording, but no wrong
+   * number, which is the property that matters. Fixing it would need a sea
+   * state estimate from contaminated data, which is the thing the whole design
+   * says cannot be had. */
+  synth_config from_start;
+  vib_sea(&from_start, 0.5f, 6.0f, 4400u);
+  from_start.burst_amp_mg = 60.0f;
+  from_start.burst_start_s = 0.0f;
+  from_start.burst_end_s = 1.0e6f;
+  const vib_trace fs = run_vib(&from_start, 200.0);
+  CHECK(fs.onset_s < 0.0f,
+        "documented limitation changed: vibration from the start now warns, "
+        "which is an improvement -- update this test and the comment above it");
+  {
+    /* And confirm the compensating property: nothing is reported as measured. */
+    synth_t syn;
+    synth_init(&syn, &from_start, WAVE_ACQ_RATE_HZ);
+    wave_session s2;
+    wave_session_init(&s2, WAVE_ACQ_RATE_HZ, 0.0f, 4000.0f);
+    wave_accel_sample buf[BATCH];
+    int held2 = 0;
+    const int total = (int)(200.0 * WAVE_ACQ_RATE_HZ);
+    for (int i = 0; i < total; i++) {
+      synth_next(&syn, &buf[held2++]);
+      if (held2 == BATCH) {
+        wave_session_push(&s2, buf, held2);
+        held2 = 0;
+      }
+    }
+    wave_display d;
+    wave_session_get_display(&s2, &d);
+    printf("      engine from 0s: valid=%d rej=%d warn_reposition=%d\n",
+           (int)d.result.valid, s2.rejected_total, (int)d.warn_reposition);
+    CHECK(!d.result.valid,
+          "vibration from the start must not produce a height at all");
+    CHECK(d.warn_reposition,
+          "vibration from the start must at least tell the user something is "
+          "wrong");
+  }
+}

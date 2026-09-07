@@ -67,11 +67,33 @@ rolling.
 - **Measure while lying to or drifting, not under way.** Making way shifts the
   encounter period: at 10 knots in a real 6 s sea, the period reads 3.9 s head-on
   and 13.3 s following. Hs survives; the period does not.
-- **Engine vibration is not subtracted.** The noise floor is calibrated ashore,
-  so it accounts for the sensor and nothing else. Vibration that reaches the
-  0.063–0.5 Hz band while the engine runs adds to the reading. If you see the
-  height change when the engine starts, that is what you are looking at — there
-  is no compensation for it yet.
+- **Engine vibration is flagged, not subtracted.** The noise floor is calibrated
+  ashore, so it accounts for the sensor and nothing else. Vibration that reaches
+  the 0.063–0.5 Hz band while the engine runs adds to the reading, and the app
+  will say **Vibration / Engine running? / Reads high** when it sees it. It is
+  deliberately not corrected: in-band vibration is indistinguishable from wave
+  energy, and estimating it from the high-frequency end is the same mistake as
+  estimating the noise floor that way — because sea spectra fall off as `f⁻¹` in
+  acceleration, most of what looks like a vibration shoulder is real signal, so
+  subtracting it would bias the height low. Stop the engine, or read the number
+  knowing it is an upper bound.
+
+  Two limits on the warning are worth knowing. It needs about a minute before it
+  can appear, because it compares the contamination against the sea state
+  measured over the previous segment. And if the engine is **already running
+  when you start**, there is no clean segment to compare against, so instead of
+  the warning you get a measurement that never completes and a **Reposition**
+  prompt. Unhelpful wording, but it will not hand you a wrong number. Start the
+  measurement with the engine off.
+
+  No warning is not proof of no vibration, in two ways. The evidence is
+  high-frequency energy, so a slow forced motion of the hull — anything without
+  content above about 1 Hz — is invisible to it while still counting as wave
+  height: a 4-second, 20 mG machinery oscillation reads as 0.46 m on a real
+  0.30 m sea, silently. And sampling at 10 Hz folds anything above 5 Hz back
+  down, so a shaft frequency near a multiple of 10 Hz can land in the wave band
+  itself, where nothing distinguishes it from swell. **Vibration** means "this
+  reading is inflated"; its absence does not mean the reading is clean.
 - **Turn on Quiet Time.** A notification buzz invalidates the segment it lands
   in, and on a boat Bluetooth reconnects can fire them repeatedly.
 

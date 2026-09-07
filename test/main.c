@@ -54,6 +54,7 @@ void test_quality_drift(void);
 void test_quality_falsepos(void);
 void test_quality_live_after_calm(void);
 void test_quality_small_motion(void);
+void test_quality_vibration(void);
 void test_accumulator(void);
 void test_accumulator_gaps(void);
 void test_accumulator_calm(void);
@@ -101,6 +102,7 @@ int main(int argc, char **argv) {
       {"quality_falsepos", test_quality_falsepos},
       {"quality_live_after_calm", test_quality_live_after_calm},
       {"quality_small_motion", test_quality_small_motion},
+      {"quality_vibration", test_quality_vibration},
       {"accumulator", test_accumulator},
       {"accumulator_gaps", test_accumulator_gaps},
       {"accumulator_calm", test_accumulator_calm},

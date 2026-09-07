@@ -107,6 +107,75 @@
  * real sea but always gives the ratio something to divide by. */
 #define WAVE_Q_MIN_REF_VAR 4.0f
 
+/*
+ * Sustained machinery vibration.
+ *
+ * The noise floor is calibrated ashore, so it covers the sensor and nothing
+ * else. Running an engine puts vibration into the accelerometer, and whatever
+ * part of it lands in the 0.063-0.5 Hz integration band is added to the wave
+ * height with nothing to offset it.
+ *
+ * It is not corrected for, deliberately. In-band vibration is indistinguishable
+ * from wave energy, and estimating it from the high-frequency end is the same
+ * mistake as estimating the noise floor that way: the acceleration spectrum of
+ * a real sea goes as f^-1, so what looks like a vibration shoulder is largely
+ * genuine signal, and subtracting it biases Hs low. Better to say the reading
+ * is inflated than to silently deflate it.
+ *
+ * What distinguishes vibration from body motion is that it does not stop. Body
+ * motion is a few seconds; an engine runs for the whole trip. So the test is
+ * the live ratio staying above its warning threshold far longer than any
+ * movement lasts.
+ *
+ * The ratio, not the absolute level. The first attempt compared live_hf_power
+ * against the still-watch level measured during calibration, times four, and
+ * that violated the rule stated at the top of this file: the high-frequency
+ * check has to be relative, because the same 1 Hz first-order high pass that
+ * feeds it passes 45% of 0.5 Hz and 16% of 0.167 Hz, so a real sea puts plenty
+ * of genuine wave acceleration into it. Measured on clean synthetic seas with
+ * no vibration at all, the still-watch reference is about 30 (mG)^2 while
+ * live_hf_power reaches 2661 at Hs 2.0 m / Tp 6 s -- the warning fired on 44 of
+ * 60 batches while the app was correctly reporting 2.10 m. Dividing by the wave
+ * band variance of the last completed segment removes the sea state from the
+ * comparison, which is exactly why the hold-still indicator already works that
+ * way.
+ *
+ * Note this makes the vibration warning coincide with the hold-still
+ * condition, so the display has to rank it FIRST or it stays masked -- see
+ * status_text in ui.c.
+ *
+ * What this cannot see: machinery with no content above the 1 Hz corner. A
+ * 0.25 Hz forced hull motion of 20 mG reads as Hs 0.46 m on a real 0.30 m sea
+ * and raises nothing, because the evidence and the contamination are then the
+ * same signal. That is the wall the whole design runs into, not a bug in the
+ * threshold -- so the warning means "inflated", never "clean when absent".
+ */
+
+/* How long the live ratio must stay above WAVE_Q_LIVE_RATIO_WARN before the
+ * cause is called machinery rather than the user. Shorter than one 32 s
+ * segment, so the warning appears before a contaminated segment can complete,
+ * and far longer than a movement: a 10 s reach for the throttle keeps the ratio
+ * up for about 14 s once the 2 s live EMA has decayed. */
+#define WAVE_Q_VIB_HOLD_S 25.0f
+
+/* A dip this short does not break the case for machinery.
+ *
+ * Requiring every single batch to be over the threshold made the warning
+ * useless: an engine's amplitude wanders with load and idle hunting, and a
+ * measured 1.5 s dip below the threshold cleared a latched warning and demanded
+ * another 25.8 s of continuous vibration to get it back -- 26 s of inflated
+ * readings with nothing on screen. The same dead zone stopped the warning
+ * appearing at all when the level sat near the threshold and the EMA rippled
+ * across it.
+ *
+ * Before the warning latches, a gap longer than this resets the clock, because
+ * what is being established is continuity, and repeated short movements
+ * separated by real quiet are not continuity. After it latches, clearing needs
+ * a full WAVE_Q_VIB_HOLD_S of quiet -- the same evidence to stop as to start,
+ * and the accumulated spectrum stays contaminated for far longer than that
+ * anyway. */
+#define WAVE_Q_VIB_GAP_S 3.0f
+
 /* Samples within this margin of full scale count as clipped. Slamming on a
  * small boat can reach several g, and a clipped sample generates broadband
  * harmonics that pollute the whole spectrum. */

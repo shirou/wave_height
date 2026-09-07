@@ -69,6 +69,17 @@ static void draw_pips(GContext *ctx, GRect bounds, wave_confidence conf) {
 }
 
 static const char *status_text(const wave_display *d) {
+  /* Ranks above the movement warnings, and has to. Sustained vibration trips
+   * the hold-still condition by construction, and it latches ~25 s in, well
+   * before the rejected segments pile up into "Reposition" -- so a lower rank
+   * would leave it masked by one or both of them for the whole trip. It is also
+   * the better advice: moving the hand does not help once the cause has been
+   * established as machinery. (The two are not nested, either way round: the
+   * latch holds through an engine's idle dips, when hold-still is briefly
+   * false.) */
+  if (d->warn_engine_vib) {
+    return "Vibration";
+  }
   if (d->warn_reposition) {
     return "Reposition";
   }
@@ -98,7 +109,8 @@ static void update_proc(Layer *layer, GContext *ctx) {
   const wave_display *d = &s_display;
 
   /* ---- status line ---- */
-  const bool warn = d->warn_hold_still || d->warn_reposition;
+  const bool warn =
+      d->warn_hold_still || d->warn_reposition || d->warn_engine_vib;
   graphics_context_set_text_color(ctx, warn ? GColorRed : GColorBlack);
   graphics_draw_text(ctx, status_text(d),
                      fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD),
@@ -109,8 +121,8 @@ static void update_proc(Layer *layer, GContext *ctx) {
   /* ---- the number ----
    *
    * TODO: a custom 70 px numeric subset (about 5 kB of resources) would read
-   * better in direct sunlight. LECO_42_NUMBERS is the built-in fallback and is
-   * what the first build ships with, so that font work cannot block bring-up. */
+   * better in direct sunlight. A built-in face is used until then (see below),
+   * so that font work cannot block bring-up. */
   char num[16];
   char unit[8];
   if (!s_rate_ok) {
@@ -141,7 +153,11 @@ static void update_proc(Layer *layer, GContext *ctx) {
       (d->result.valid && s_rate_ok && d->result.hs >= WAVE_CALM_BELOW_M);
   /* LECO_60 is the largest numeric face emery has, and reading the number at a
    * glance on a moving boat is what the whole layout is for. It is a
-   * numerals-and-AM/PM subset, which does include the decimal separator. */
+   * numerals-and-AM/PM subset, so whether it carries '.' at all is
+   * load-bearing -- "1.5" rendering as "15" would be a ten-fold misread. The
+   * SDK ships no font files to inspect, so this was settled by forcing the face
+   * with a literal "1.5" and screenshotting the emery emulator: the decimal
+   * point draws. Re-check the same way if the face is ever changed. */
   GFont big = numeric
                   ? fonts_get_system_font(FONT_KEY_LECO_60_BOLD_NUMBERS_AM_PM)
                   : fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD);
@@ -167,6 +183,10 @@ static void update_proc(Layer *layer, GContext *ctx) {
   if (!s_rate_ok) {
     snprintf(sub1, sizeof(sub1), "Wrong sample");
     snprintf(sub2, sizeof(sub2), "rate");
+  } else if (d->warn_engine_vib) {
+    /* "Vibration" alone does not say which way the reading is wrong. */
+    snprintf(sub1, sizeof(sub1), "Engine running?");
+    snprintf(sub2, sizeof(sub2), "Reads high");
   } else if (d->result.valid && d->result.hs >= WAVE_CALM_BELOW_M &&
              d->result.period > 0.0f) {
     /* Whole seconds only: the single-segment spread of Tm-1,0 is about 0.57 s,

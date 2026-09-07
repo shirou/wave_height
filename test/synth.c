@@ -164,9 +164,11 @@ void synth_next(synth_t *s, wave_accel_sample *out) {
     a_z_mg += (double)c->trend_mg_per_segment * (t / 32.0);
   }
 
-  /* Body-motion burst. */
+  /* Body-motion burst, optionally with a hole in it. */
   if (c->burst_amp_mg != 0.0f && t >= (double)c->burst_start_s &&
-      t < (double)c->burst_end_s) {
+      t < (double)c->burst_end_s &&
+      !(c->burst_gap_end_s > c->burst_gap_start_s &&
+        t >= (double)c->burst_gap_start_s && t < (double)c->burst_gap_end_s)) {
     a_z_mg += (double)c->burst_amp_mg *
               sin(2.0 * M_PI * (double)c->burst_freq_hz * t);
   }

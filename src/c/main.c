@@ -156,17 +156,26 @@ static void accel_handler(AccelData *data, uint32_t num_samples) {
    * emulator and on the watch. Only on change, to keep the log readable. */
   static int s_last_seg = -1;
   static int s_last_state = -1;
-  if (d.result.n_seg != s_last_seg || (int)d.state != s_last_state) {
+  static int s_last_vib = -1;
+  /* vib is in here because the alternative is being unable to tell, after a
+   * trip with no warning, whether the engine was quiet or the detector never
+   * ran. */
+  if (d.result.n_seg != s_last_seg || (int)d.state != s_last_state ||
+      (int)d.warn_engine_vib != s_last_vib) {
     s_last_seg = d.result.n_seg;
     s_last_state = (int)d.state;
+    s_last_vib = (int)d.warn_engine_vib;
     /* Round to centimetres first, then split; see format_1dp in ui.c for why
      * splitting before rounding is wrong. */
     const int hs_cm = (int)(d.result.hs * 100.0f + 0.5f);
     APP_LOG(APP_LOG_LEVEL_INFO,
-            "t=%ds state=%d seg=%d rej=%d Hs=%d.%02dm T=%ds conf=%d",
+            "t=%ds state=%d seg=%d rej=%d Hs=%d.%02dm T=%ds conf=%d vib=%d "
+            "ratio=%d%%",
             (int)s_session.elapsed_s, (int)d.state, d.result.n_seg,
             s_session.rejected_total, hs_cm / 100, hs_cm % 100,
-            (int)(d.result.period + 0.5f), (int)d.result.conf);
+            (int)(d.result.period + 0.5f), (int)d.result.conf,
+            (int)d.warn_engine_vib,
+            (int)(s_session.live_hf_ratio * 100.0f + 0.5f));
   }
 }
 

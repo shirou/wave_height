@@ -69,6 +69,14 @@ typedef struct {
    * 32 s, which is far too late to change what the user is doing. */
   float live_hf_ratio;
 
+  /* Sustained-vibration clock, driven from live_hf_ratio once per batch.
+   * t_vib_quiet is what keeps a latched warning alive across an engine's
+   * amplitude dips; see WAVE_Q_VIB_GAP_S. */
+  float t_vib_high;
+  float t_vib_quiet;
+  bool vib_high_prev; /* so the batch that crosses the threshold is not counted */
+  bool engine_vib;
+
   /* Accept every segment regardless of the quality verdict.
    *
    * Required for the known-motion bench test: waving the watch by hand at a
@@ -85,6 +93,11 @@ typedef struct {
   float valid_s;
   bool warn_hold_still;
   bool warn_reposition;
+  /* Machinery vibration is inflating the reading by an unknown amount. Not
+   * corrected for -- see quality.h for why -- so the user is told instead.
+   * Named for the engine to keep it clear of wave_quality's `vibrated`, which
+   * means the watch's own notification buzzer fired. */
+  bool warn_engine_vib;
 } wave_display;
 
 /* full_scale_mg and noise_floor both come from the on-device spike; see the
