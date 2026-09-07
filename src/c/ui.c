@@ -118,7 +118,7 @@ static void update_proc(Layer *layer, GContext *ctx) {
      * rather than something believable. */
     snprintf(num, sizeof(num), "rate?");
     unit[0] = '\0';
-  } else if (d->result.valid) {
+  } else if (d->result.valid && d->result.hs >= WAVE_CALM_BELOW_M) {
     const float h = wh_display_height(s_cfg, d->hs_display);
     /* One decimal is right for 0.1 m steps and harmless for 0.5 m steps. */
     format_1dp(num, sizeof(num), h);
@@ -136,7 +136,8 @@ static void update_proc(Layer *layer, GContext *ctx) {
   }
 
   graphics_context_set_text_color(ctx, GColorBlack);
-  const bool numeric = (d->result.valid && s_rate_ok);
+  const bool numeric =
+      (d->result.valid && s_rate_ok && d->result.hs >= WAVE_CALM_BELOW_M);
   GFont big = numeric ? fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS)
                       : fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD);
 
@@ -158,7 +159,8 @@ static void update_proc(Layer *layer, GContext *ctx) {
   if (!s_rate_ok) {
     snprintf(sub1, sizeof(sub1), "Wrong sample");
     snprintf(sub2, sizeof(sub2), "rate");
-  } else if (d->result.valid && d->result.period > 0.0f) {
+  } else if (d->result.valid && d->result.hs >= WAVE_CALM_BELOW_M &&
+             d->result.period > 0.0f) {
     /* Whole seconds only: the single-segment spread of Tm-1,0 is about 0.57 s,
      * so a decimal place would be fiction. */
     snprintf(sub1, sizeof(sub1), "Period %ds", (int)(d->result.period + 0.5f));
@@ -184,7 +186,8 @@ static void update_proc(Layer *layer, GContext *ctx) {
    *
    * The boat stops following waves shorter than this, so the reading is low.
    * Nothing in the number itself hints at that, hence the explicit note. */
-  if (d->result.valid && d->result.period > 0.0f &&
+  if (d->result.valid && d->result.hs >= WAVE_CALM_BELOW_M &&
+      d->result.period > 0.0f &&
       d->result.period < wh_follow_limit_period(s_cfg)) {
     graphics_context_set_text_color(ctx, GColorRed);
     graphics_draw_text(ctx, "Short waves - reads low",

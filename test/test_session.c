@@ -19,6 +19,7 @@
 #include <float.h>
 #include <string.h>
 
+#include "../src/c/wave/calibration.h"
 #include "../src/c/wave/session.h"
 #include "synth.h"
 #include "test_util.h"
@@ -351,4 +352,104 @@ void test_session_ema(void) {
 
   /* And confidence keeps counting past the horizon rather than sticking. */
   CHECK(acc.n_seg > WAVE_EMA_MAX_SEG, "segment count should keep rising");
+}
+
+/*
+ * A still watch must read "calm", not a small number.
+ *
+ * Subtracting the noise floor cannot reach zero -- the residual scatters, and
+ * the mean of 4*sqrt(m0) over the positive draws stays above it -- so the
+ * display has a threshold instead. Hardware showed 0.10 to 0.16 m on a table
+ * before this was in place, which is squarely inside the range a real small
+ * sea occupies.
+ */
+void test_session_calm_display(void) {
+  synth_config cfg;
+  synth_default_config(&cfg);
+  cfg.hs = 0.0f; /* a still watch */
+  cfg.tp = 6.0f;
+  cfg.noise_sigma_mg = 2.9f;
+  cfg.quantize_1mg = true;
+  cfg.seed = 5150u;
+
+  synth_t syn;
+  synth_init(&syn, &cfg, WAVE_ACQ_RATE_HZ);
+
+  wave_session s;
+  wave_session_init(&s, WAVE_ACQ_RATE_HZ, 0.0f, 4000.0f);
+  feed_seconds(&s, &syn, 16.0 + 32.0 * 6.0 + 2.0);
+
+  wave_display d;
+  wave_session_get_display(&s, &d);
+
+  printf("      still watch after %d segments: Hs=%.4f m (calm threshold %.2f)\n",
+         d.result.n_seg, (double)d.result.hs, (double)WAVE_CALM_BELOW_M);
+
+  CHECK(d.result.n_seg >= 4, "expected several segments, got %d",
+        d.result.n_seg);
+
+  /* The residual must be small enough that the threshold catches it. If this
+   * fails, either the floor subtraction regressed or the threshold is too low
+   * for the noise the estimator actually leaves behind. */
+  CHECK_LT(d.result.hs, WAVE_CALM_BELOW_M,
+           "a still watch must fall below the calm threshold");
+
+  /* And a real sea must not be swallowed by that threshold. */
+  synth_config sea;
+  synth_default_config(&sea);
+  sea.hs = 0.3f;
+  sea.tp = 6.0f;
+  sea.noise_sigma_mg = 2.9f;
+  sea.quantize_1mg = true;
+  sea.seed = 5151u;
+
+  synth_t syn2;
+  synth_init(&syn2, &sea, WAVE_ACQ_RATE_HZ);
+  wave_session s2;
+  wave_session_init(&s2, WAVE_ACQ_RATE_HZ, 0.0f, 4000.0f);
+  feed_seconds(&s2, &syn2, 16.0 + 32.0 * 6.0 + 2.0);
+
+  wave_display d2;
+  wave_session_get_display(&s2, &d2);
+  printf("      Hs=0.3 m sea: measured %.3f m\n", (double)d2.result.hs);
+  CHECK(d2.result.hs >= WAVE_CALM_BELOW_M,
+        "a 0.3 m sea must read as a number, not as calm (got %.3f)",
+        (double)d2.result.hs);
+
+  /* Again at the noise level the hardware actually has.
+   *
+   * On-watch calibration returned 1.116e-3, about 6.9x the figure the design
+   * assumed, which corresponds to sigma near 7.6 mG. That is the condition the
+   * calm threshold has to hold under, not the optimistic one -- and it is what
+   * made a still watch on a table read 0.1 to 0.16 m before the per-bin clamp
+   * was removed. */
+  synth_config hw;
+  synth_default_config(&hw);
+  hw.hs = 0.0f;
+  hw.tp = 6.0f;
+  hw.noise_sigma_mg = 7.6f;
+  hw.quantize_1mg = true;
+  hw.seed = 5152u;
+
+  /* Calibrate first, as the user would, then measure with that floor. */
+  synth_t cal_syn;
+  synth_init(&cal_syn, &hw, WAVE_ACQ_RATE_HZ);
+  wave_session cal;
+  wave_session_init(&cal, WAVE_ACQ_RATE_HZ, 0.0f, 4000.0f);
+  feed_seconds(&cal, &cal_syn, 16.0 + 32.0 * WAVE_CALIB_SEGMENTS + 2.0);
+  const float floor_psd = wave_accum_noise_estimate(&cal.acc);
+
+  hw.seed = 5153u;
+  synth_t hw_syn;
+  synth_init(&hw_syn, &hw, WAVE_ACQ_RATE_HZ);
+  wave_session s3;
+  wave_session_init(&s3, WAVE_ACQ_RATE_HZ, floor_psd, 4000.0f);
+  feed_seconds(&s3, &hw_syn, 16.0 + 32.0 * 6.0 + 2.0);
+
+  wave_display d3;
+  wave_session_get_display(&s3, &d3);
+  printf("      at hardware noise (7.6 mG): floor %.3e, still watch %.4f m\n",
+         (double)floor_psd, (double)d3.result.hs);
+  CHECK_LT(d3.result.hs, WAVE_CALM_BELOW_M,
+           "a still watch at hardware noise must still read calm");
 }

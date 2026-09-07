@@ -73,6 +73,20 @@
  * spectral work: Hs = 4*sqrt(m0) only holds when m0 is in m^2. */
 #define WAVE_MG_TO_MS2 9.80665e-3f
 
+/* Below this, report a calm rather than a number.
+ *
+ * Not cosmetic. Subtracting the measured noise floor cannot drive a still
+ * watch to zero, however good the calibration: the residual scatters either
+ * side of zero, negative draws are reported as no-result, and the mean of
+ * 4*sqrt(m0) over the positive ones is therefore always above zero. Measured
+ * on the host it settles around 0.03 m, and on hardware -- whose noise floor
+ * turned out about seven times the assumed figure -- around 0.05 m.
+ *
+ * Showing "0.1 m" for a millpond is worse than useless, because it is within
+ * the range a real small sea occupies. 0.1 m is above the residual and below
+ * anything worth reporting. */
+#define WAVE_CALM_BELOW_M 0.1f
+
 /* ---- Data types -------------------------------------------------------- */
 
 /* One accelerometer sample, decoupled from the SDK's AccelData so that the

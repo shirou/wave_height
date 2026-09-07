@@ -201,21 +201,29 @@ bool wave_accum_result(const wave_accumulator *a, wave_result *out) {
   for (int k = WAVE_BIN_LO; k <= WAVE_BIN_HI; k++) {
     const int i = k - WAVE_BIN_LO;
 
-    /* Clamp the noise-floor residual per bin, before any weighting. Letting a
-     * negative residual through would cancel genuine energy elsewhere and can
-     * drag m0 below zero -- on a flat calm that happens more than half the
-     * time, and 4*sqrt(negative) is NaN. */
-    float resid = a->s_avg[k] - a->noise_floor;
-    if (resid < 0.0f) {
-      resid = 0.0f;
-    }
+    /* The residual is NOT clamped per bin.
+     *
+     * Clamping each bin was the obvious way to keep m0 non-negative, and it is
+     * wrong. Noise scatters either side of the floor, so discarding the
+     * negative excursions while keeping the positive ones leaves roughly half
+     * the noise behind as signal -- a systematic overestimate that no amount of
+     * averaging removes. On a still watch on a table it read 0.1 m, with the
+     * period pinned to 15 s because what survived sat in the lowest bin, where
+     * the 1/f^4 weighting is harshest.
+     *
+     * Summing signed residuals lets the excursions cancel, which is the whole
+     * point of subtracting a floor. m0 is then clamped once, below, which is
+     * all that is needed to keep the square root real. */
+    const float resid = a->s_avg[k] - a->noise_floor;
 
     m0 += s_w_m0[i] * resid * WAVE_DF;
     m_minus1 += s_w_mm1[i] * resid * WAVE_DF;
   }
 
   if (!(m0 > 0.0f) || !wave_isfinite(m0)) {
-    /* Flat calm, or everything clamped away. Not an error. */
+    /* Everything cancelled out, or went negative: a flat calm, where the
+     * measured spectrum is indistinguishable from the noise floor. Not an
+     * error, and the caller shows "calm" rather than a number. */
     return false;
   }
 
