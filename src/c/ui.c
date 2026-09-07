@@ -70,7 +70,7 @@ static void draw_pips(GContext *ctx, GRect bounds, wave_confidence conf) {
 
 static const char *status_text(const wave_display *d) {
   if (d->warn_reposition) {
-    return "Reposition hand";
+    return "Reposition";
   }
   if (d->warn_hold_still) {
     return "Hold still";
@@ -100,8 +100,9 @@ static void update_proc(Layer *layer, GContext *ctx) {
   /* ---- status line ---- */
   const bool warn = d->warn_hold_still || d->warn_reposition;
   graphics_context_set_text_color(ctx, warn ? GColorRed : GColorBlack);
-  graphics_draw_text(ctx, status_text(d), fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD),
-                     GRect(b.origin.x + 6, b.origin.y + 2, b.size.w - 60, 24),
+  graphics_draw_text(ctx, status_text(d),
+                     fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD),
+                     GRect(b.origin.x + 5, b.origin.y + 0, b.size.w - 62, 30),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
   draw_pips(ctx, b, d->result.conf);
 
@@ -138,16 +139,23 @@ static void update_proc(Layer *layer, GContext *ctx) {
   graphics_context_set_text_color(ctx, GColorBlack);
   const bool numeric =
       (d->result.valid && s_rate_ok && d->result.hs >= WAVE_CALM_BELOW_M);
-  GFont big = numeric ? fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS)
-                      : fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD);
+  /* LECO_60 is the largest numeric face emery has, and reading the number at a
+   * glance on a moving boat is what the whole layout is for. It is a
+   * numerals-and-AM/PM subset, which does include the decimal separator. */
+  GFont big = numeric
+                  ? fonts_get_system_font(FONT_KEY_LECO_60_BOLD_NUMBERS_AM_PM)
+                  : fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD);
 
   graphics_draw_text(ctx, num, big,
-                     GRect(b.origin.x, b.origin.y + 62, b.size.w - 48, 56),
-                     GTextOverflowModeWordWrap, GTextAlignmentRight, NULL);
+                     GRect(b.origin.x, b.origin.y + 30, b.size.w - 46, 78),
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentRight,
+                     NULL);
   if (unit[0] != '\0') {
-    graphics_draw_text(ctx, unit, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD),
-                       GRect(b.origin.x + b.size.w - 44, b.origin.y + 84, 40, 30),
-                       GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
+    graphics_draw_text(ctx, unit,
+                       fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD),
+                       GRect(b.origin.x + b.size.w - 44, b.origin.y + 62, 40, 34),
+                       GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft,
+                       NULL);
   }
 
   /* ---- period and one-tenth height ---- */
