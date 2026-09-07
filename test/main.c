@@ -23,6 +23,7 @@ int g_test_failures = 0;
 const char *g_current_test = NULL;
 
 void test_fft(void);
+void test_rate_check(void);
 void test_detrend(void);
 void test_spectrum(void);
 void test_spectrum_longperiod(void);
@@ -46,6 +47,7 @@ void test_quality_vibrate(void);
 void test_quality_drift(void);
 void test_quality_falsepos(void);
 void test_quality_live_after_calm(void);
+void test_quality_small_motion(void);
 void test_accumulator(void);
 void test_accumulator_gaps(void);
 void test_accumulator_calm(void);
@@ -60,6 +62,7 @@ typedef struct {
 int main(int argc, char **argv) {
   static const test_entry tests[] = {
       {"fft", test_fft},
+      {"rate_check", test_rate_check},
       {"detrend", test_detrend},
       {"spectrum", test_spectrum},
       {"spectrum_longperiod", test_spectrum_longperiod},
@@ -85,6 +88,7 @@ int main(int argc, char **argv) {
       {"quality_drift", test_quality_drift},
       {"quality_falsepos", test_quality_falsepos},
       {"quality_live_after_calm", test_quality_live_after_calm},
+      {"quality_small_motion", test_quality_small_motion},
       {"accumulator", test_accumulator},
       {"accumulator_gaps", test_accumulator_gaps},
       {"accumulator_calm", test_accumulator_calm},

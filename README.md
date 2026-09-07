@@ -113,11 +113,11 @@ the watch being pressed against a fitting.
 because the moment you want to calibrate is aboard, out of range, having just
 noticed a flat calm reading 0.1 m.
 
-- **Boat length** — 5 to 12 m. Only ever used to warn you when the measured
-  period drops below what your hull follows; it never scales the answer.
+- **Boat length** — 5, 6, 8, 10 or 12 m. Only ever used to warn you when the
+  measured period drops below what your hull follows; it never scales the answer.
 - **Units** — metres or feet.
 - **Noise floor** — put the watch down on something solid and leave it for about
-  a minute and a half. It measures its own sensor noise and stores it, which is
+  two minutes. It measures its own sensor noise and stores it, which is
   what lets a flat calm read "calm". Quality gating stays on during this, so if
   you hold the watch instead the segments are discarded and the count stops
   advancing rather than quietly calibrating against your hand tremor.
@@ -166,17 +166,20 @@ sea does not come with an answer key.
 cd test && make check
 ```
 
-29 groups covering the FFT, spectral normalisation, detrending, the noise floor,
+31 groups covering the FFT, spectral normalisation, detrending, the noise floor,
 the leakage-corrected integration weights, decimation droop, gravity projection
 against the rejected alternative, the lever-arm artefact, quality gating
-(including that it does *not* reject rough seas), Welch accumulation, and the
-state machine including persistence and its rejection paths, and noise-floor
-calibration.
+(including that it does *not* reject rough seas), Welch accumulation, the state
+machine including persistence and its rejection paths, noise-floor calibration,
+and the sample-rate sanity check.
 
 Several are difference tests rather than absolute bands, because an absolute band
 often passes with the feature deleted. Removing the leakage correction fails 6
 groups; removing droop compensation fails 8; substituting the rejected
-`|a|`-based vertical extraction fails the gravity comparison.
+`|a|`-based vertical extraction fails the gravity comparison. Thresholds are
+pinned from both sides where it matters — lowering the motion gate's absolute
+floor makes a still watch fail to calibrate, raising it lets a 40 mG shake
+through.
 
 To drive the emulator with a synthetic sea:
 
@@ -206,8 +209,8 @@ Known gaps:
   leaving harbour rather than after.
 - **Calibration is verified on the host, not in the emulator.** The emulator's
   accelerometer injection caps at 255 samples per call and its packets stop
-  decoding when they are fed back to back, so a 90-second calibration run cannot
-  be driven through it. The logic is covered by host tests instead, including
+  decoding when they are fed back to back, so a two-minute calibration run
+  cannot be driven through it. The logic is covered by host tests instead, including
   that a still watch calibrates to within a few percent of the expected noise
   power and that a held watch refuses to complete.
 

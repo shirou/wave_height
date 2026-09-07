@@ -17,6 +17,7 @@
 #ifndef WAVE_CALIBRATION_H
 #define WAVE_CALIBRATION_H
 
+#include "gravity.h"
 #include "session.h"
 #include "wave_types.h"
 
@@ -48,7 +49,6 @@
 typedef struct {
   wave_session session;
   bool active;
-  int target;
 } wave_calibration;
 
 void wave_calib_start(wave_calibration *c, float acq_rate_hz,
@@ -63,6 +63,10 @@ bool wave_calib_active(const wave_calibration *c);
 /* Segments accepted so far, and how many are wanted. */
 int wave_calib_progress(const wave_calibration *c);
 int wave_calib_target(const wave_calibration *c);
+
+/* Roughly how long a run takes, for the benefit of documentation and the UI:
+ * the settling window plus one segment per target. */
+#define WAVE_CALIB_SECONDS   ((int)(WAVE_G_SETTLE_S + WAVE_CALIB_SEGMENTS * WAVE_SEG_SAMPLES /                                WAVE_PROC_RATE_HZ))
 
 /* Segments thrown out, which is what the user needs to see if they are holding
  * the watch instead of resting it on something. */

@@ -143,6 +143,10 @@ void wave_session_push(wave_session *s, const wave_accel_sample *samples,
   }
 }
 
+void wave_session_set_noise_floor(wave_session *s, float noise_floor) {
+  s->acc.noise_floor = noise_floor;
+}
+
 float wave_session_round_hs(float hs, wave_confidence conf) {
   const float step = (conf <= WAVE_CONF_LOW) ? 0.5f : 0.1f;
   return floorf(hs / step + 0.5f) * step;

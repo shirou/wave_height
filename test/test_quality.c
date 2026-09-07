@@ -280,3 +280,38 @@ void test_quality_live_after_calm(void) {
         "segment was accepted (zero reference variance must not silence it)");
   CHECK(t_warn < 8.0, "warning took %.1f s; should be a few seconds", t_warn);
 }
+
+/*
+ * The absolute floor that lets a still watch through must not be set so high
+ * that real movement slips under it.
+ *
+ * Measured on the host: hf_power is about 4.5 for a still watch, 440 for a
+ * 40 mG shake and 44000 for a 400 mG one. The floor has to sit between the
+ * first two, and this pins the upper end -- raising it by 10x would let this
+ * case through, while test_calibration pins the lower end by requiring a still
+ * watch to be accepted. Between them the constant cannot drift far enough to
+ * change behaviour.
+ */
+void test_quality_small_motion(void) {
+  synth_config cfg;
+  synth_default_config(&cfg);
+  cfg.hs = 0.0f; /* no waves, so the ratio is decided by the movement alone */
+  cfg.tp = 6.0f;
+  cfg.seed = 8080u;
+  cfg.noise_sigma_mg = 2.9f;
+  cfg.quantize_1mg = true;
+  cfg.burst_amp_mg = 40.0f;
+  cfg.burst_freq_hz = 2.5f;
+  cfg.burst_start_s = 0.0f;
+  cfg.burst_end_s = 1e6f;
+
+  int total = 0;
+  const double rate = rejection_rate(&cfg, 16.0 + 32.0 * 5.0, &total);
+  printf("      40 mG shake: %.0f%% of %d segments rejected\n", rate * 100.0,
+         total);
+  CHECK(total >= 3, "expected several segments, got %d", total);
+  CHECK(rate > 0.9,
+        "a 40 mG shake should still be rejected, got %.0f%% -- the absolute "
+        "floor may be set too high",
+        rate * 100.0);
+}

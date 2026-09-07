@@ -245,7 +245,8 @@ float wave_accum_noise_estimate(const wave_accumulator *a) {
     band[m++] = a->s_avg[k];
   }
 
-  /* Insertion sort: fifteen elements, once, at the end of a calibration run. */
+  /* Insertion sort over the in-band bins, once, at the end of a calibration
+   * run. Small enough that anything cleverer would be noise. */
   for (int i = 1; i < m; i++) {
     const float v = band[i];
     int j = i - 1;

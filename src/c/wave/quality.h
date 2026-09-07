@@ -58,9 +58,12 @@
  * the condition noise-floor calibration runs in, and without this floor
  * calibration can never complete.
  *
- * 100 (mG)^2 is 10 mG rms, several times the assumed sensor noise (which
- * contributes about 7) and well below any real hand movement (a 400 mG shake is
- * 80000). */
+ * 100 (mG)^2 is 10 mG rms. Measured on the host: a still watch produces about
+ * 4.5, a 40 mG shake about 440, and a 400 mG shake about 44000. So the floor
+ * sits an order of magnitude above sensor noise and two below real hand
+ * movement. The exact value is not critical -- anything from roughly 5 to 40000
+ * behaves the same -- but both ends are pinned by tests, so it cannot drift far
+ * enough to matter. */
 #define WAVE_Q_HF_ABSOLUTE_MIN 100.0f
 
 /* Maximum drift of the gravity direction across one segment, in degrees. */

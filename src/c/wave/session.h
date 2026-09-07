@@ -97,6 +97,13 @@ void wave_session_push(wave_session *s, const wave_accel_sample *samples, int n)
 
 void wave_session_get_display(const wave_session *s, wave_display *out);
 
+/* Replace the noise-floor constant, e.g. after the user calibrates it.
+ *
+ * The accumulated spectrum is untouched on purpose: the floor is subtracted
+ * when the result is computed, not when a segment is folded in, so a freshly
+ * measured floor applies to everything already gathered. */
+void wave_session_set_noise_floor(wave_session *s, float noise_floor);
+
 /* Round Hs to a step the measurement can actually support: 0.5 m while only one
  * or two segments are in (relative sd 23-31%), 0.1 m after that. Showing 0.1 m
  * steps on a +/-31% estimate would be inventing precision. */

@@ -27,6 +27,8 @@
 #include "settings.h"
 #include "settings_window.h"
 #include "ui.h"
+#include "wave/calibration.h"
+#include "wave/rate_check.h"
 #include "wave/session.h"
 
 #define WH_PERSIST_KEY_SNAPSHOT 2
@@ -41,6 +43,11 @@
 static Window *s_window;
 static wave_session s_session;
 static wh_settings s_settings;
+
+/* Calibration lives here rather than in the settings UI: it is a measurement
+ * object that runs its own pipeline, and this file owns those. The settings
+ * window only drives and displays it. */
+static wave_calibration s_calib;
 
 static AccelSamplingRate sampling_rate_for(float hz) {
   if (hz >= 100.0f) {
@@ -68,15 +75,21 @@ static void verify_sampling_rate(const AccelData *data, int n) {
   if (checked || n < 2) {
     return;
   }
-  checked = true;
 
   const uint64_t span_ms = data[n - 1].timestamp - data[0].timestamp;
-  if (span_ms == 0) {
-    return; /* emulator injection can deliver a batch with no time spread */
+  float measured_hz = 0.0f;
+  const wave_rate_verdict verdict =
+      wave_check_rate(span_ms, n, WAVE_ACQ_RATE_HZ, &measured_hz);
+
+  /* A batch with no time spread proves nothing, so keep looking at later ones.
+   * Latching "checked" here -- as the first version did -- means a single such
+   * batch at startup disables the check for the whole run. */
+  if (verdict == WAVE_RATE_UNKNOWN) {
+    return;
   }
-  const float measured_hz = 1000.0f * (float)(n - 1) / (float)span_ms;
-  const float ratio = measured_hz / WAVE_ACQ_RATE_HZ;
-  if (ratio < 0.75f || ratio > 1.33f) {
+  checked = true;
+
+  if (verdict == WAVE_RATE_WRONG) {
     APP_LOG(APP_LOG_LEVEL_ERROR,
             "accelerometer is running at ~%d Hz, not the %d Hz assumed; "
             "measurement disabled",
@@ -87,6 +100,7 @@ static void verify_sampling_rate(const AccelData *data, int n) {
      * while looking entirely plausible. Stop feeding the estimator instead. */
     s_rate_ok = false;
     wh_ui_set_rate_ok(false);
+    wh_settings_window_set_rate_ok(false);
   }
 }
 
@@ -109,17 +123,22 @@ static void accel_handler(AccelData *data, uint32_t num_samples) {
   wh_datalog_push(buf, n);
   wh_ui_set_logging(wh_datalog_available());
 
-  /* While the noise floor is being calibrated the samples belong to that run
-   * and must not also be folded into the measurement, or the two would
-   * accumulate from the same data. */
-  if (wh_settings_feed_accel(buf, n)) {
-    return;
-  }
-
+  /* The rate check comes before both consumers. Calibration at the wrong rate
+   * is worse than useless: it would put the spectrum on the wrong frequency
+   * axis and store the median as the noise floor, to be subtracted from every
+   * later measurement. */
   if (!s_rate_ok) {
     wave_display stale;
     wave_session_get_display(&s_session, &stale);
     wh_ui_set(&stale);
+    return;
+  }
+
+  /* While the noise floor is being calibrated the samples belong to that run
+   * and must not also be folded into the measurement, or the two would
+   * accumulate from the same data. */
+  if (wave_calib_active(&s_calib)) {
+    wave_calib_push(&s_calib, buf, n);
     return;
   }
 
@@ -180,7 +199,7 @@ static void back_long_click(ClickRecognizerRef recognizer, void *context) {
 }
 
 static void select_click(ClickRecognizerRef recognizer, void *context) {
-  wh_settings_window_push(&s_settings);
+  wh_settings_window_push(&s_settings, &s_calib);
 }
 
 static void click_config_provider(void *context) {
@@ -200,7 +219,7 @@ static void window_appear(Window *window) {
    * subtracted when the result is computed, not when a segment is folded in, so
    * a freshly calibrated floor applies to everything already gathered. Throwing
    * the accumulation away would cost the user their measurement for no gain. */
-  s_session.acc.noise_floor = s_settings.noise_floor;
+  wave_session_set_noise_floor(&s_session, s_settings.noise_floor);
   s_session.diagnostic = s_settings.diagnostic_mode;
 }
 
@@ -253,6 +272,7 @@ static void deinit(void) {
   accel_data_service_unsubscribe();
   save_snapshot();
   wh_datalog_deinit();
+  wh_settings_window_deinit();
   window_destroy(s_window);
 }
 

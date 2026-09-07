@@ -88,8 +88,8 @@ void test_calibration(void) {
   printf("      measured %.3e, expected %.3e (%.0f%%)\n", (double)measured,
          expected, (double)measured / expected * 100.0);
 
-  /* A median over fifteen bins and three segments; a factor of two either way
-   * would be a real error, small scatter is not. */
+  /* A median over the in-band bins across three segments; a factor of two either
+   * way would be a real error, small scatter is not. */
   CHECK_NEAR(measured, expected, 0.5, "calibrated noise floor");
 
   wave_calib_stop(&cal);

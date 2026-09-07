@@ -26,7 +26,6 @@ void wave_calib_start(wave_calibration *c, float acq_rate_hz,
    * subtracting a previous estimate would fold it into the new one. */
   wave_session_init(&c->session, acq_rate_hz, 0.0f, full_scale_mg);
 
-  c->target = WAVE_CALIB_SEGMENTS;
   c->active = true;
 }
 
@@ -47,7 +46,11 @@ int wave_calib_progress(const wave_calibration *c) {
 }
 
 int wave_calib_target(const wave_calibration *c) {
-  return c->target;
+  /* The handle is unused -- the target is a compile-time constant -- but the
+   * signature matches the rest of the wave_calib_* accessors, so callers do not
+   * have to remember which one is different. */
+  (void)c;
+  return WAVE_CALIB_SEGMENTS;
 }
 
 int wave_calib_rejected(const wave_calibration *c) {
@@ -55,7 +58,7 @@ int wave_calib_rejected(const wave_calibration *c) {
 }
 
 bool wave_calib_done(const wave_calibration *c) {
-  return c->session.acc.n_seg >= c->target;
+  return c->session.acc.n_seg >= WAVE_CALIB_SEGMENTS;
 }
 
 float wave_calib_result(const wave_calibration *c) {
