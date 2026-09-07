@@ -150,9 +150,71 @@ on something solid; until then a still watch shows roughly 0.1 m instead.
 uv tool install pebble-tool --python 3.13
 pebble sdk install latest
 
-pebble build
-pebble install --emulator emery
+pebble build                        # produces build/wave_height.pbw
+pebble install --emulator emery     # run it in the emulator
 ```
+
+Built against SDK 4.33.1, targeting `emery` only.
+
+## Installing on a watch
+
+The watch is reached through the Pebble app on your phone, so the phone and the
+computer have to be on the same Wi-Fi network.
+
+**1. Turn on the developer connection in the phone app.**
+
+- *Android* — three-dot menu → Settings → enable **Developer Mode** → tap
+  **Developer Connection** → toggle it on (top right). Note the **Server IP**.
+- *iOS* — left-hand menu → Settings → enable **Developer Mode** → back to the
+  menu → **Developer** → toggle **Developer Connection** on. Note the
+  **Server IP**.
+
+**2. Install.**
+
+```sh
+pebble install --phone 192.168.1.42        # the Server IP from step 1
+```
+
+Save the address to skip the flag each time:
+
+```sh
+export PEBBLE_PHONE=192.168.1.42
+pebble install
+```
+
+**3. Watch the logs** — `APP_LOG` output comes back over the same connection,
+which is how to see the calibration result, the segment-by-segment state, and
+the warning if the accelerometer is not running at the expected rate:
+
+```sh
+pebble logs                     # or: pebble install --logs
+```
+
+Other routes, if Wi-Fi is inconvenient:
+
+```sh
+pebble install --adb            # Android over USB; starts the dev connection for you
+pebble install --cloudpebble    # via the CloudPebble connection (GitHub auth)
+pebble install --serial /dev/ttyUSB0
+```
+
+`build/wave_height.pbw` can also be installed by hand — send it to the phone and
+open it with the Pebble app — which is the route to use for someone who is not
+set up for development.
+
+### First run on a watch
+
+Two things to do before trusting a reading:
+
+1. **Settings → Noise floor.** Put the watch on something solid for about two
+   minutes. Until this is done a still watch reads roughly 0.1 m rather than
+   "calm", because sensor noise alone accounts for that much.
+2. **Enable Quiet Time while measuring.** A notification buzz invalidates the
+   32-second segment it lands in, and Bluetooth reconnects aboard can fire them
+   repeatedly.
+
+Also set **Settings → Boat length** to something close to your hull, so the
+short-wave warning is calibrated to the right period.
 
 ## Testing
 
