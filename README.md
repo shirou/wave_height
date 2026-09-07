@@ -121,21 +121,10 @@ noticed a flat calm reading 0.1 m.
 - **Boat length** — 5, 6, 8, 10 or 12 m. Only ever used to warn you when the
   measured period drops below what your hull follows; it never scales the answer.
 - **Units** — metres or feet.
-- **Noise floor** — put the watch down on something solid and leave it for about
-  two minutes. It measures its own sensor noise and stores it, which is
-  what lets a flat calm read "calm". Quality gating stays on during this, so if
-  you hold the watch instead the segments are discarded and the count stops
-  advancing rather than quietly calibrating against your hand tremor.
-
-  **Do this ashore, on a table — not afloat.** What it measures is the sensor's
-  own noise, which only works where there is no wave energy to confuse it with.
-  Calibrating in a swell records that swell as noise and subtracts it from every
-  later measurement, which makes real seas read low.
-
-  Once is enough; the value is stored. Measured on a Pebble Time 2 it comes out
-  around 1.1e-3, about seven times the figure this app was designed around, so
-  running it genuinely matters — without it a still watch reads about 0.17 m
-  instead of "calm".
+- **Noise floor** — measures the accelerometer's own noise so that a flat calm
+  reads "calm". **Run it once, ashore, on a table** — see
+  [Calibrating the noise floor](#calibrating-the-noise-floor), which explains
+  where and why, because getting the location wrong makes real seas read low.
 - **Diagnostic** — accepts every segment regardless of quality. Needed for the
   bench test where you shake the watch at a fixed period, which otherwise trips
   the motion gate on every segment. Leave it off for real measurements.
@@ -155,9 +144,10 @@ Expect ±40% against a reference buoy in ordinary conditions, and treat the numb
 as "about 1.5 m", not "1.47 m".
 
 In a flat calm it reads **calm** rather than a number — but only once the noise
-floor has been calibrated, because sensor noise alone accounts for about 0.07 m
-of apparent height. Run **Settings → Noise floor** once, with the watch resting
-on something solid; until then a still watch shows roughly 0.1 m instead.
+floor has been calibrated, because sensor noise alone accounts for a tenth of a
+metre or more of apparent height. See
+[Calibrating the noise floor](#calibrating-the-noise-floor); it has to be done
+ashore, and until it is, a still watch shows a number rather than "calm".
 
 ## Building
 
@@ -229,16 +219,44 @@ pebble install --serial /dev/ttyUSB0
 phone and open it with the Pebble app — which is the route for someone who is
 not set up for development at all.
 
-### First run on a watch
+### Calibrating the noise floor
 
-Two things to do before trusting a reading:
+**Do this once, ashore, before the first trip. On a table, indoors, with the
+watch off your wrist.**
 
-1. **Settings → Noise floor.** Put the watch on something solid for about two
-   minutes. Until this is done a still watch reads roughly 0.1 m rather than
-   "calm", because sensor noise alone accounts for that much.
-2. **Enable Quiet Time while measuring.** A notification buzz invalidates the
-   32-second segment it lands in, and Bluetooth reconnects aboard can fire them
-   repeatedly.
+```
+Select → Noise floor → leave it alone for about two minutes
+```
+
+The app is measuring its own accelerometer's noise. That only works somewhere
+with no wave energy to confuse it with, which is why it has to be ashore:
+
+- **On a table indoors** — correct. Nothing is moving.
+- **On your wrist, sitting still** — no. Your pulse and tremor get recorded as
+  sensor noise and subtracted from every later reading.
+- **Aboard, tied up in harbour** — no. Harbour slop is small but it is real wave
+  energy, and subtracting it makes real seas read low.
+- **Aboard, under way or in a swell** — definitely not. This is the case that
+  ruins the calibration outright.
+
+Quality gating stays on throughout, so a watch that is being held or knocked has
+those segments discarded and the progress count stops advancing. If `0 / 3` sits
+there not moving, something is disturbing it.
+
+The value is stored and survives reinstalling, so once is enough. Redo it only
+if the readings look wrong, or on a different watch.
+
+**Why it matters:** measured on a Pebble Time 2 the floor comes out around
+1.1e-3, roughly seven times the figure this app was designed around. Skip the
+calibration and a watch sitting on a table reads about **0.17 m** instead of
+**calm** — and 0.17 m is squarely inside the range a real small sea occupies, so
+there is no way to tell the difference by looking.
+
+### Also before the first trip
+
+**Enable Quiet Time while measuring.** A notification buzz invalidates the
+32-second segment it lands in, and Bluetooth reconnects aboard can fire them
+repeatedly.
 
 Also set **Settings → Boat length** to something close to your hull, so the
 short-wave warning is calibrated to the right period.
