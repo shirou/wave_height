@@ -158,49 +158,61 @@ Built against SDK 4.33.1, targeting `emery` only.
 
 ## Installing on a watch
 
-The watch is reached through the Pebble app on your phone, so the phone and the
-computer have to be on the same Wi-Fi network.
+The watch is reached through the Pebble app on your phone. The current
+(Core Devices) app relays through the cloud, so the computer and the phone do
+**not** have to be on the same network.
 
-**1. Turn on the developer connection in the phone app.**
+**One-time setup**
 
-- *Android* — three-dot menu → Settings → enable **Developer Mode** → tap
-  **Developer Connection** → toggle it on (top right). Note the **Server IP**.
-- *iOS* — left-hand menu → Settings → enable **Developer Mode** → back to the
-  menu → **Developer** → toggle **Developer Connection** on. Note the
-  **Server IP**.
+1. In the phone app: **Devices → ⋯ → Enable Dev Connect**, then sign in with
+   GitHub.
+2. On the computer, sign in with the *same* GitHub account:
 
-**2. Install.**
+   ```sh
+   pebble login          # pebble login --status to check
+   ```
+
+**Install**
 
 ```sh
-pebble install --phone 192.168.1.42        # the Server IP from step 1
+pebble build
+pebble install --cloudpebble
 ```
 
-Save the address to skip the flag each time:
+**Watch the logs.** `APP_LOG` output comes back over the same connection, which
+is how to see the calibration result, the segment-by-segment state, and the
+warning if the accelerometer is not running at the expected rate:
 
 ```sh
-export PEBBLE_PHONE=192.168.1.42
-pebble install
+pebble logs --cloudpebble        # or: pebble install --cloudpebble --logs
 ```
 
-**3. Watch the logs** — `APP_LOG` output comes back over the same connection,
-which is how to see the calibration result, the segment-by-segment state, and
-the warning if the accelerometer is not running at the expected rate:
+### Over local Wi-Fi instead
+
+Still supported, and useful when offline, but fiddlier. **Two separate toggles
+have to be on** — with only one, the tool gets a refused connection:
+
+1. **Devices → ⋯ → Enable Dev Connect** (as above), and
+2. **LAN developer** in the app's Settings.
+
+Then use the **Server IP** the app shows:
 
 ```sh
-pebble logs                     # or: pebble install --logs
+pebble install --phone 192.168.1.42
+export PEBBLE_PHONE=192.168.1.42   # to skip the flag next time
+pebble logs --phone 192.168.1.42
 ```
 
-Other routes, if Wi-Fi is inconvenient:
+### Other routes
 
 ```sh
-pebble install --adb            # Android over USB; starts the dev connection for you
-pebble install --cloudpebble    # via the CloudPebble connection (GitHub auth)
+pebble install --adb              # Android over USB
 pebble install --serial /dev/ttyUSB0
 ```
 
-`build/wave_height.pbw` can also be installed by hand — send it to the phone and
-open it with the Pebble app — which is the route to use for someone who is not
-set up for development.
+`build/wave_height.pbw` can also be installed by hand — send the file to the
+phone and open it with the Pebble app — which is the route for someone who is
+not set up for development at all.
 
 ### First run on a watch
 
