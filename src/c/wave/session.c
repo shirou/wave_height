@@ -48,7 +48,9 @@ static void finish_segment(wave_session *s) {
   }
 
   if (ok) {
-    float psd[WAVE_NBINS];
+    /* At file scope for the same reason as the FFT buffers: this runs at the
+     * bottom of the accelerometer callback's deepest chain. */
+    static float psd[WAVE_NBINS];
     wave_spectrum_segment(s->seg, psd);
     wave_accum_add(&s->acc, psd);
     s->valid_s += (float)WAVE_SEG_SAMPLES / WAVE_PROC_RATE_HZ;

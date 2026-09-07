@@ -105,7 +105,11 @@ static void verify_sampling_rate(const AccelData *data, int n) {
 }
 
 static void accel_handler(AccelData *data, uint32_t num_samples) {
-  wave_accel_sample buf[WH_BATCH_MAX];
+  /* Static, not automatic: this is the entry point of the deepest call chain in
+   * the app, and every byte here is a byte the spectrum and FFT below cannot
+   * have. Single-threaded, and the buffer is consumed before the callback
+   * returns. */
+  static wave_accel_sample buf[WH_BATCH_MAX];
   const int n =
       (num_samples > WH_BATCH_MAX) ? WH_BATCH_MAX : (int)num_samples;
 

@@ -72,14 +72,29 @@ void wave_spectrum_segment(const float *a_vert_ms2, float *psd_out) {
   wave_spectrum_segment_ex(a_vert_ms2, psd_out, true);
 }
 
+/* FFT working buffers at file scope rather than on the stack.
+ *
+ * Two float[64] is 512 bytes, and this function sits at the bottom of the
+ * deepest call chain in the app: the accelerometer callback closes a segment,
+ * which detrends, windows, transforms and integrates. Measured with
+ * -fstack-usage, that chain reached about 1.3 kB against a Pebble app stack of
+ * roughly 2 kB, and with the SDK's own callback frames on top it overflowed --
+ * which showed up as a fault deep inside libm's sqrtf, the next call after the
+ * spectrum returned, rather than anywhere near the real cause.
+ *
+ * Safe to share: single-threaded, and one segment is fully processed before the
+ * next begins. */
+static float s_re[WAVE_SEG_SAMPLES];
+static float s_im[WAVE_SEG_SAMPLES];
+
 void wave_spectrum_segment_ex(const float *a_vert_ms2, float *psd_out,
                               bool compensate_droop) {
   if (!s_win_ready) {
     build_window();
   }
 
-  float re[WAVE_SEG_SAMPLES];
-  float im[WAVE_SEG_SAMPLES];
+  float *re = s_re;
+  float *im = s_im;
 
   for (int i = 0; i < WAVE_SEG_SAMPLES; i++) {
     re[i] = a_vert_ms2[i];
