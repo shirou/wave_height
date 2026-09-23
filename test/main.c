@@ -22,6 +22,8 @@
 int g_test_failures = 0;
 const char *g_current_test = NULL;
 
+void test_vibration_filter(void);
+void test_filter_session(void);
 void test_fft(void);
 void test_rate_check(void);
 void test_fastmath_sqrt(void);
@@ -68,6 +70,8 @@ typedef struct {
 
 int main(int argc, char **argv) {
   static const test_entry tests[] = {
+      {"vibration_filter", test_vibration_filter},
+      {"filter_session", test_filter_session},
       {"fft", test_fft},
       {"rate_check", test_rate_check},
       {"fastmath_sqrt", test_fastmath_sqrt},

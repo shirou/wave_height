@@ -32,13 +32,37 @@ void wave_session_init(wave_session *s, float acq_rate_hz, float noise_floor,
   wave_decim_init(&s->dec);
   wave_quality_init(&s->qual, s->acq_rate, full_scale_mg);
   wave_accum_init(&s->acc, noise_floor);
+  s->calibrated_noise_floor = noise_floor;
+  wave_vibration_filter_init(&s->filter, WAVE_FILTER_ORIGINAL, s->acq_rate);
 
   s->state = WAVE_STATE_SETTLING;
 }
 
+void wave_session_set_filter(wave_session *s, wave_filter_mode mode) {
+  if ((unsigned)mode >= WAVE_FILTER_COUNT) {
+    mode = WAVE_FILTER_ORIGINAL;
+  }
+  if (s->filter.mode == mode) {
+    return;
+  }
+  const float rate = s->acq_rate;
+  const float floor = s->calibrated_noise_floor;
+  const float scale = s->qual.clip_threshold_mg + WAVE_Q_CLIP_MARGIN_MG;
+  const bool diagnostic = s->diagnostic;
+  wave_session_init(s, rate, floor, scale);
+  s->diagnostic = diagnostic;
+  wave_vibration_filter_init(&s->filter, mode, rate);
+  /* The legacy scalar noise calibration is not valid after filtering.
+   * Keep it for Original; trial readings use no subtraction. */
+  if (mode != WAVE_FILTER_ORIGINAL) {
+    s->acc.noise_floor = 0.0f;
+  }
+}
+
 /* Close out a full segment: score it, and either fold it in or throw it away. */
 static void finish_segment(wave_session *s) {
-  const bool ok = s->diagnostic || wave_quality_segment_ok(&s->qual);
+  s->last_verdict = wave_quality_verdict_of(&s->qual);
+  const bool ok = s->diagnostic || s->last_verdict == WAVE_Q_OK;
 
   /* Latch this segment's wave-band variance as the denominator for the live
    * warning. Only from accepted segments: a segment full of body motion has an
@@ -83,6 +107,10 @@ void wave_session_push(wave_session *s, const wave_accel_sample *samples,
     wave_gravity_push(&s->grav, a);
 
     if (!wave_gravity_converged(&s->grav)) {
+      float warmup;
+      if (wave_gravity_project(&s->grav, a, &warmup)) {
+        wave_vibration_filter_push(&s->filter, warmup);
+      }
       /* Still averaging the gravity direction. Collect nothing: starting a
        * segment now and discarding it later would push the first reading out to
        * two segment lengths, whereas simply waiting keeps it at one. */
@@ -113,6 +141,9 @@ void wave_session_push(wave_session *s, const wave_accel_sample *samples,
       continue;
     }
 
+    vert_mg = wave_vibration_filter_push(&s->filter, vert_mg);
+    /* Score residual fast motion after filtering; raw clipping, watch buzzes
+     * and attitude drift still reject a segment in every trial mode. */
     wave_quality_push_raw(&s->qual, a, vert_mg, smp->did_vibrate);
     wave_quality_update_gravity(&s->qual, s->grav.g_hat);
 
@@ -178,7 +209,8 @@ void wave_session_push(wave_session *s, const wave_accel_sample *samples,
 }
 
 void wave_session_set_noise_floor(wave_session *s, float noise_floor) {
-  s->acc.noise_floor = noise_floor;
+  s->calibrated_noise_floor = noise_floor;
+  s->acc.noise_floor = s->filter.mode == WAVE_FILTER_ORIGINAL ? noise_floor : 0.0f;
 }
 
 float wave_session_round_hs(float hs, wave_confidence conf) {
@@ -189,6 +221,8 @@ float wave_session_round_hs(float hs, wave_confidence conf) {
 void wave_session_get_display(const wave_session *s, wave_display *out) {
   memset(out, 0, sizeof(*out));
   out->state = s->state;
+  out->filter_mode = s->filter.mode;
+  out->rejected_total = s->rejected_total;
   out->valid_s = s->valid_s;
 
   wave_accum_result(&s->acc, &out->result);
@@ -202,6 +236,7 @@ void wave_session_get_display(const wave_session *s, wave_display *out) {
   out->warn_hold_still = (s->state == WAVE_STATE_PAUSED) ||
                          (s->live_hf_ratio > WAVE_Q_LIVE_RATIO_WARN);
   out->warn_reposition = (s->rejected_run >= WAVE_REPOSITION_AFTER);
+  out->last_verdict = s->last_verdict;
   out->warn_engine_vib = s->engine_vib;
 }
 
@@ -209,14 +244,15 @@ void wave_session_save(const wave_session *s, wave_session_snapshot *out,
                        uint32_t unix_time) {
   memset(out, 0, sizeof(*out));
   memcpy(out->s_avg, s->acc.s_avg, sizeof(out->s_avg));
-  out->magic = WAVE_SNAPSHOT_MAGIC;
+  out->magic = s->filter.mode == WAVE_FILTER_ORIGINAL ? WAVE_SNAPSHOT_MAGIC : 0;
   out->n_seg = (int32_t)s->acc.n_seg;
   out->unix_time = unix_time;
 }
 
 bool wave_session_restore(wave_session *s, const wave_session_snapshot *snap,
                           uint32_t unix_time, uint32_t max_age_s) {
-  if (snap->magic != WAVE_SNAPSHOT_MAGIC) {
+  if (s->filter.mode != WAVE_FILTER_ORIGINAL ||
+      snap->magic != WAVE_SNAPSHOT_MAGIC) {
     return false;
   }
   /* An implausible count means a corrupt entry, and it would also let

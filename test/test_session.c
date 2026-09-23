@@ -190,6 +190,8 @@ void test_session(void) {
           "to %d",
           during.result.n_seg);
     CHECK(s.rejected_total >= 1, "expected at least one rejected segment");
+    CHECK(during.last_verdict == WAVE_Q_FAIL_HF,
+          "display must retain the HF rejection after segment reset");
     CHECK(during.result.valid,
           "the earlier good segment must survive a rejection");
 
@@ -208,9 +210,41 @@ void test_session(void) {
     wave_display after;
     wave_session_get_display(&s, &after);
     CHECK(after.result.n_seg > 1, "should resume accumulating after the burst");
+    CHECK(after.last_verdict == WAVE_Q_OK,
+          "a successful segment must clear the old rejection reason");
     printf("      rejected %d segment(s), warning cleared, recovered to "
            "n_seg=%d\n",
            s.rejected_total, after.result.n_seg);
+  }
+
+  /* Repeated notification buzzes from startup: no accepted reference exists,
+   * but the display must still explain why Reposition appeared. */
+  {
+    wave_session s;
+    wave_session_init(&s, WAVE_ACQ_RATE_HZ, 0.0f, 4000.0f);
+    wave_accel_sample buf[BATCH];
+    for (int i = 0; i < BATCH; i++) {
+      buf[i] = (wave_accel_sample){0, 0, 1000, true};
+    }
+    for (int i = 0; i < 46; i++) {
+      wave_session_push(&s, buf, BATCH);
+    }
+    wave_display d;
+    wave_session_get_display(&s, &d);
+    CHECK(d.result.n_seg == 0, "buzzing segments must not be accepted");
+    CHECK(d.warn_reposition, "three rejected segments must warn");
+    CHECK(d.last_verdict == WAVE_Q_FAIL_VIBRATE,
+          "startup rejections must retain the watch-buzzer reason");
+    for (int i = 0; i < BATCH; i++) {
+      buf[i].did_vibrate = false;
+    }
+    for (int i = 0; i < 27; i++) {
+      wave_session_push(&s, buf, BATCH);
+    }
+    wave_session_get_display(&s, &d);
+    CHECK(d.result.n_seg > 0, "measurement must recover when buzzing stops");
+    CHECK(!d.warn_reposition && d.last_verdict == WAVE_Q_OK,
+          "recovery must clear both warning and reason");
   }
 }
 

@@ -21,6 +21,7 @@
 #include "decimate.h"
 #include "gravity.h"
 #include "quality.h"
+#include "vibration_filter.h"
 #include "wave_types.h"
 
 /*
@@ -52,6 +53,8 @@ typedef struct {
   wave_decimator dec;
   wave_quality qual;
   wave_accumulator acc;
+  wave_vibration_filter filter;
+  float calibrated_noise_floor;
 
   wave_session_state state;
   float seg[WAVE_SEG_SAMPLES]; /* decimated vertical acceleration, m/s^2 */
@@ -59,6 +62,7 @@ typedef struct {
 
   int rejected_run;   /* consecutive rejected segments */
   int rejected_total;
+  wave_quality_verdict last_verdict; /* last completed segment, before reset */
   float elapsed_s;    /* since init or restore */
   float valid_s;      /* time folded into the average */
   float acq_rate;
@@ -89,10 +93,13 @@ typedef struct {
 typedef struct {
   wave_session_state state;
   wave_result result;
+  wave_filter_mode filter_mode;
+  int rejected_total;
   float hs_display;   /* result.hs rounded to match the confidence */
   float valid_s;
   bool warn_hold_still;
   bool warn_reposition;
+  wave_quality_verdict last_verdict;
   /* Machinery vibration is inflating the reading by an unknown amount. Not
    * corrected for -- see quality.h for why -- so the user is told instead.
    * Named for the engine to keep it clear of wave_quality's `vibrated`, which
@@ -104,6 +111,9 @@ typedef struct {
  * plan. noise_floor is a one-sided PSD in (m/s^2)^2/Hz, not a sigma. */
 void wave_session_init(wave_session *s, float acq_rate_hz, float noise_floor,
                        float full_scale_mg);
+
+/* Changing mode clears all accumulated data and restarts settling. */
+void wave_session_set_filter(wave_session *s, wave_filter_mode mode);
 
 /* Feed one accelerometer batch, exactly as the SDK delivers it. */
 void wave_session_push(wave_session *s, const wave_accel_sample *samples, int n);

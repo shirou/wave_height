@@ -112,6 +112,57 @@ up again. If the app sees you move it says **Hold still** and drops that segment
 what you have already banked is kept, and the warning clears within a few seconds
 of you settling down again.
 
+**Reposition** means three consecutive 32-second segments were rejected; it
+does not necessarily mean your hand moved. When no segment has been accepted,
+or Reposition is showing, the lower lines explain the last rejection:
+**Tilt changed**, **Motion / vibration**, **Sensor overload**, or **Watch buzzed**.
+These identify the failed check, not a confirmed physical cause. Hull motion or
+vibration can fail a check even with your wrist supported. The reason updates
+at the end of each segment and clears after a good segment. Device logs include
+each rejection with `reason=1` (tilt), `2` (motion/vibration), `3` (overload), or
+`4` (watch buzzer); `0` means the quality checks passed.
+
+### Trying vibration filters aboard
+
+Press Select to open settings, highlight **Vibration filter**, and press Select
+to cycle **Original → Mild → Medium → Strong**. Press Back to return to the
+measurement. No phone, computer, or engine stop is needed to change the mode.
+Changing modes restarts the measurement, including the initial 16-second
+levelling period; the first accepted result can appear after about 50 seconds.
+The selection survives closing the app. Trial measurements start fresh on relaunch.
+Selecting a filter also turns Diagnostic off so the remaining quality checks run.
+
+| Mode | Filter | Intended comparison |
+|------|--------|---------------------|
+| Original | Existing 5-sample average | Baseline, including the original rejection rule |
+| Mild | 0.8 Hz low pass, then existing average | First trial; preserves most of the wave band |
+| Medium | 0.5 Hz low pass, then existing average | More suppression; reduces the shortest measured waves |
+| Strong | 0.3 Hz low pass, then existing average | Strongest suppression; can substantially reduce short-wave height |
+
+The three trial filters are fourth-order Butterworth filters on projected
+vertical acceleration, before decimation. Filter state continues across segment
+boundaries and warms up during levelling. Fast-motion quality checks use the
+filtered signal; raw sensor clipping, notification buzzes, and attitude drift
+still reject segments. These modes are not the Diagnostic bypass.
+
+The screen footer shows the mode, **A** (accepted segments), and **R** (rejected
+segments). Try each mode for **2–3 minutes** with the same wrist support and
+similar engine speed; note the height, A/R counts, and any rejection reason.
+Prefer comparing Original, Mild, Medium, then Strong. A smaller number alone
+does not establish a more accurate result. Trial modes show **Trial - may read
+low**, and their high confidence dots describe accumulation, not field validation.
+
+These are experimental filters tested with synthetic data, not verified engine
+removal. Acquisition remains at 10 Hz: vibration already folded into the wave
+band by acquisition, or actual slow machinery motion within that band, cannot
+be distinguished from waves by these filters. Hand motion may also be suppressed.
+No correction is applied for the new filters' attenuation. The stored Original
+noise calibration is preserved but not subtracted in trial modes because it
+does not describe their filtered spectrum; residual noise can therefore raise
+small readings. Original and trial spectra are never mixed or restored across
+modes. Logs include `filter=0/1/2/3` for Original/Mild/Medium/Strong; raw logging
+continues to capture the unfiltered samples.
+
 The warning is deliberately less trigger-happy than the rejection: a warning that
 fires on ordinary wave-to-wave variation just teaches you to ignore it, whereas
 dropping a segment only costs half a minute.

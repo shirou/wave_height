@@ -31,6 +31,7 @@ static const uint8_t s_lengths[] = {5, 6, 8, 10, 12};
 enum {
   ROW_BOAT = 0,
   ROW_UNITS,
+  ROW_FILTER,
   ROW_CALIBRATE,
   ROW_DIAGNOSTIC,
   NUM_ROWS
@@ -258,6 +259,11 @@ static void menu_draw_row(GContext *ctx, const Layer *cell_layer,
         snprintf(value, sizeof(value), "not calibrated");
       }
       break;
+    case ROW_FILTER:
+      title = "Vibration filter";
+      snprintf(value, sizeof(value), "%s - resets reading",
+               wave_filter_name((wave_filter_mode)s_cfg->filter_mode));
+      break;
     case ROW_DIAGNOSTIC:
       title = "Diagnostic";
       snprintf(value, sizeof(value), "%s", s_cfg->diagnostic_mode ? "ON" : "off");
@@ -290,6 +296,10 @@ static void menu_select(MenuLayer *ml, MenuIndex *index, void *context) {
     }
     case ROW_UNITS:
       s_cfg->use_feet = !s_cfg->use_feet;
+      break;
+    case ROW_FILTER:
+      s_cfg->filter_mode = (s_cfg->filter_mode + 1) % WAVE_FILTER_COUNT;
+      s_cfg->diagnostic_mode = false;
       break;
     case ROW_CALIBRATE:
       push_calibration();

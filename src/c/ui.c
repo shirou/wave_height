@@ -187,6 +187,30 @@ static void update_proc(Layer *layer, GContext *ctx) {
     /* "Vibration" alone does not say which way the reading is wrong. */
     snprintf(sub1, sizeof(sub1), "Engine running?");
     snprintf(sub2, sizeof(sub2), "Reads high");
+  } else if (d->last_verdict != WAVE_Q_OK &&
+             (d->warn_reposition || d->result.n_seg == 0)) {
+    /* Keep the last rejection visible while the next segment is collected.
+     * Reposition alone cannot distinguish wrist movement from hull vibration. */
+    const char *reason = "Motion / vibration";
+    const char *advice = "Try a quieter spot";
+    switch (d->last_verdict) {
+      case WAVE_Q_FAIL_DRIFT:
+        reason = "Tilt changed";
+        advice = "Support wrist";
+        break;
+      case WAVE_Q_FAIL_CLIP:
+        reason = "Sensor overload";
+        advice = "Avoid shocks";
+        break;
+      case WAVE_Q_FAIL_VIBRATE:
+        reason = "Watch buzzed";
+        advice = "Enable Quiet Time";
+        break;
+      default:
+        break;
+    }
+    snprintf(sub1, sizeof(sub1), "%s", reason);
+    snprintf(sub2, sizeof(sub2), "%s", advice);
   } else if (d->result.valid && d->result.hs >= WAVE_CALM_BELOW_M &&
              d->result.period > 0.0f) {
     /* Whole seconds only: the single-segment spread of Tm-1,0 is about 0.57 s,
@@ -214,11 +238,14 @@ static void update_proc(Layer *layer, GContext *ctx) {
    *
    * The boat stops following waves shorter than this, so the reading is low.
    * Nothing in the number itself hints at that, hence the explicit note. */
-  if (d->result.valid && d->result.hs >= WAVE_CALM_BELOW_M &&
+  if (d->filter_mode != WAVE_FILTER_ORIGINAL ||
+      (d->result.valid && d->result.hs >= WAVE_CALM_BELOW_M &&
       d->result.period > 0.0f &&
-      d->result.period < wh_follow_limit_period(s_cfg)) {
+      d->result.period < wh_follow_limit_period(s_cfg))) {
     graphics_context_set_text_color(ctx, GColorRed);
-    graphics_draw_text(ctx, "Short waves - reads low",
+    graphics_draw_text(ctx, d->filter_mode != WAVE_FILTER_ORIGINAL
+                               ? "Trial - may read low"
+                               : "Short waves - reads low",
                        fonts_get_system_font(FONT_KEY_GOTHIC_18),
                        GRect(b.origin.x + 4, b.origin.y + 168, b.size.w - 8, 24),
                        GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter,
@@ -258,11 +285,15 @@ static void update_proc(Layer *layer, GContext *ctx) {
    * disagreed with the reference buoy, and it is expected to run unattended
    * while out of phone range. If it is not running, the user has to be told on
    * the watch -- discovering it back ashore is too late. */
-  if (!s_logging_ok) {
-    graphics_context_set_text_color(ctx, GColorRed);
-    graphics_draw_text(ctx, "no raw log",
+  {
+    char footer[64];
+    snprintf(footer, sizeof(footer), "%s A:%d R:%d%s",
+             wave_filter_name(d->filter_mode), d->result.n_seg,
+             d->rejected_total, s_logging_ok ? "" : " no log");
+    graphics_context_set_text_color(ctx, s_logging_ok ? GColorBlack : GColorRed);
+    graphics_draw_text(ctx, footer,
                        fonts_get_system_font(FONT_KEY_GOTHIC_14),
-                       GRect(bar_x, bar_y + 12, bar_w, 16),
+                       GRect(bar_x, bar_y + 12, b.size.w - 12, 16),
                        GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft,
                        NULL);
   }

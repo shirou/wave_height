@@ -21,6 +21,7 @@
 #include <stdint.h>
 
 #include "wave/wave_types.h"
+#include "wave/vibration_filter.h"
 
 /* Default boat length: the fishing-charter class this app is aimed at. */
 #define WH_DEFAULT_BOAT_LENGTH_M 10.0f
@@ -38,7 +39,7 @@
  * old bytes get reinterpreted; since diagnostic_mode is a bool, a stray non-zero
  * byte landing there would silently bypass all quality gating. Bump on any
  * layout change. */
-#define WH_SETTINGS_SCHEMA 1u
+#define WH_SETTINGS_SCHEMA 2u
 
 /* Sanity ceiling for the calibrated noise floor. The expected value for the
  * assumed sensor is about 1.6e-4; this is roughly a hundred times that. A wildly
@@ -55,6 +56,7 @@ typedef struct {
   bool use_feet;
   bool diagnostic_mode;
   bool intro_seen;
+  uint8_t filter_mode; /* occupies schema 1's trailing padding */
 } wh_settings;
 
 void wh_settings_load(wh_settings *s);

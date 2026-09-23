@@ -17,10 +17,15 @@
 #include "settings.h"
 
 #include <pebble.h>
+#include <stddef.h>
 
 #include "wave/fastmath.h"
 
 #define WH_PERSIST_KEY_SETTINGS 1
+
+/* Schema 1 was 20 bytes, with a padding byte after intro_seen. */
+typedef char settings_layout_check[
+    sizeof(wh_settings) == 20 && offsetof(wh_settings, filter_mode) == 19 ? 1 : -1];
 
 void wh_settings_load(wh_settings *s) {
   s->schema_version = WH_SETTINGS_SCHEMA;
@@ -30,13 +35,18 @@ void wh_settings_load(wh_settings *s) {
   s->use_feet = false;
   s->diagnostic_mode = false;
   s->intro_seen = false;
+  s->filter_mode = WAVE_FILTER_ORIGINAL;
 
   if (persist_exists(WH_PERSIST_KEY_SETTINGS)) {
-    wh_settings stored;
+    wh_settings stored = {0};
     const int read = persist_read_data(WH_PERSIST_KEY_SETTINGS, &stored,
                                        sizeof(stored));
     if (read == (int)sizeof(stored) &&
-        stored.schema_version == WH_SETTINGS_SCHEMA) {
+        (stored.schema_version == WH_SETTINGS_SCHEMA || stored.schema_version == 1u)) {
+      if (stored.schema_version == 1u) {
+        stored.filter_mode = WAVE_FILTER_ORIGINAL;
+        stored.schema_version = WH_SETTINGS_SCHEMA;
+      }
       *s = stored;
     } else if (read > 0) {
       APP_LOG(APP_LOG_LEVEL_WARNING,
@@ -46,6 +56,9 @@ void wh_settings_load(wh_settings *s) {
   }
 
   /* Guard against a stored value that would break the maths. */
+  if (s->filter_mode >= WAVE_FILTER_COUNT) {
+    s->filter_mode = WAVE_FILTER_ORIGINAL;
+  }
   if (!(s->boat_length_m > 0.5f) || s->boat_length_m > 50.0f) {
     s->boat_length_m = WH_DEFAULT_BOAT_LENGTH_M;
   }
